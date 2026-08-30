@@ -278,6 +278,9 @@ const state = {
   trendMetric: "tokens",
   trendPeriod: 7,
   selectedDeviceId: null,
+  deviceRefreshing: false,
+  deviceRefreshStartedAt: null,
+  deviceRefreshAttempts: 0,
 };
 
 const DEFAULT_PRICING = {
@@ -878,7 +881,10 @@ function renderDeviceDetail() {
         <h1>${escapeHtml(device.name)}</h1>
         <div class="desc">Statistiques propres à cet appareil</div>
       </div>
-      ${device.id !== "legacy" ? `<button class="btn" data-rename-device="${device.id}">Renommer</button>` : ""}
+      <div style="display:flex;gap:8px">
+        ${device.id !== "legacy" ? `<button class="btn" id="btn-refresh-device" data-refresh-device="${device.id}" ${state.deviceRefreshing ? "disabled" : ""}>${state.deviceRefreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir"}</button>` : ""}
+        ${device.id !== "legacy" ? `<button class="btn" data-rename-device="${device.id}">Renommer</button>` : ""}
+      </div>
     </div>
     <div class="card">
       <div class="card-body" style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
@@ -891,7 +897,8 @@ function renderDeviceDetail() {
         ${device.lastSeen ? `<div><div class="hint" style="color:var(--ink-faint)">Dernier contact</div><div class="mono" style="font-size:13px">${timeAgo(device.lastSeen)}</div></div>` : ""}
         <div><div class="hint" style="color:var(--ink-faint)">Dernière donnée reçue</div><div class="mono" style="font-size:13px">${lastImported ? timeAgo(lastImported) : "—"}</div></div>
       </div>
-    </div>`;
+    </div>
+    ${deviceRefreshProgressBanner(device)}`;
 
   if (rows.length === 0) {
     return `${header}<div class="card"><div class="empty"><div class="big">▧</div>Aucune conso reçue pour cet appareil pour l'instant.</div></div>`;
@@ -1311,6 +1318,38 @@ async function handleRefreshClick() {
     : "Aucun agent local détecté — vérifie l'installation dans l'onglet Synchro");
 }
 
+/* ---------------- on-demand refresh scope a un seul appareil ---------------- */
+function deviceLastImported(deviceId) {
+  return state.usage.filter(u => u.deviceId === deviceId).reduce((max, u) => !max || u.importedAt > max ? u.importedAt : max, null);
+}
+
+function deviceRefreshProgressBanner(device) {
+  if (!state.deviceRefreshing) return "";
+  const elapsedSec = Math.round((Date.now() - state.deviceRefreshStartedAt) / 1000);
+  const st = deviceStatus(device);
+  const line = st.seen
+    ? `Appareil détecté (vu il y a ${Math.round(st.secAgo)}s) — en attente de son prochain passage.`
+    : elapsedSec > 90
+      ? `Aucun signe de cet appareil depuis le début de l'attente. Vérifie que l'agent tourne dessus.`
+      : `En attente d'un premier contact de cet appareil…`;
+  return `
+    <div class="card" style="border-color:var(--accent)">
+      <div class="card-body" style="display:flex;align-items:center;gap:14px">
+        <div class="mono" style="font-size:20px;color:var(--accent)">${elapsedSec}s</div>
+        <div>
+          <div><strong>Synchro en cours</strong> <span class="hint" style="color:var(--ink-faint)">(vérification n°${state.deviceRefreshAttempts})</span></div>
+          <div class="hint" style="color:var(--ink-dim);margin-top:2px">${line}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function handleDeviceRefreshClick(deviceId) {
+  const previousImportedAt = deviceLastImported(deviceId);
+  state.deviceRefreshing = true;
+  state.deviceRefreshStartedAt = Date.now();
+  state.deviceRefreshAttempts = 0;
+  render();
 /* ---------------- manual import fallback ---------------- */
 async function handleImportManual() {
   const raw = document.getElementById("import-json").value.trim();
