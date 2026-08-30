@@ -1038,14 +1038,15 @@ function deviceBillingSummary(deviceId) {
     if (amount > 0) entries.push({ invoiceId: inv.id, date: inv.createdAt, amount, status: inv.status, clientId: inv.clientId });
   }
   entries.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  const totalBilled = entries.reduce((s, e) => s + e.amount, 0);
   const totalPaid = entries.filter(e => e.status === "paid").reduce((s, e) => s + e.amount, 0);
-  return { totalBilled, totalPaid, totalPending: totalBilled - totalPaid, entries };
+  return { totalPaid, entries };
 }
 
 function buildDeviceBillingCard(deviceId) {
   const b = deviceBillingSummary(deviceId);
   if (b.entries.length === 0) return "";
+  const deviceTotalCost = computeTokenCostForDevice(deviceId, null, null).cost;
+  const remaining = deviceTotalCost - b.totalPaid;
   return `
     <div class="card">
       <div class="card-head"><h3>Facturation de cet appareil</h3></div>
