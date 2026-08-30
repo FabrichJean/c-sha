@@ -412,8 +412,21 @@ function allPromoCodes() {
 
 function buildPromoCodeItem() {
   if (!state.data.hasClient) return "";
-  const options = allPromoCodes().map(pc => `<option value="${pc.id}" ${state.data.currentPromoCodeId === pc.id ? "selected" : ""}>${escapeHtml(pc.code)} — ${escapeHtml(pc.promotionName)} (÷${pc.divisor})</option>`).join("");
-  return `<div class="info-item"><div class="il">Code promo</div><select id="device-promo-select" class="period-select" style="margin-top:3px"><option value="">— aucun —</option>${options}</select></div>`;
+  const current = state.data.currentPromoCodeId ? allPromoCodes().find(pc => pc.id === state.data.currentPromoCodeId) : null;
+  if (current) {
+    return `<div class="info-item"><div class="il">Code promo</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+        <span class="mono" style="font-size:12.5px">${escapeHtml(current.code)} (÷${current.divisor})</span>
+        <button class="btn ghost sm" id="btn-remove-device-promo">Retirer</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="info-item"><div class="il">Code promo</div>
+    <div style="display:flex;gap:6px;margin-top:3px">
+      <input id="device-promo-input" placeholder="CODE" style="width:110px;text-transform:uppercase;font-size:12.5px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink)">
+      <button class="btn sm" id="btn-apply-device-promo">Appliquer</button>
+    </div>
+  </div>`;
 }
 
 const INVOICE_STATUS_LABELS = { draft: "Brouillon", sent: "Envoyée", paid: "Payée" };
@@ -618,22 +631,32 @@ function wire() {
   const detailPageNext = document.getElementById("detail-page-next");
   if (detailPageNext) detailPageNext.onclick = () => { state.detailPage++; render(); };
 
-  const promoSelect = document.getElementById("device-promo-select");
-  if (promoSelect) {
-    promoSelect.onchange = async () => {
-      try {
-        const res = await fetch(`/api/device-view/${encodeURIComponent(DEVICE_ID)}/${encodeURIComponent(TOKEN)}/promo-code`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ promoCodeId: promoSelect.value || null }),
-        });
-        if (!res.ok) throw new Error("echec");
-        await loadData();
-      } catch (e) {
-        alert("Erreur lors de la mise à jour du code promo.");
-      }
+  async function updateDevicePromoCode(promoCodeId) {
+    try {
+      const res = await fetch(`/api/device-view/${encodeURIComponent(DEVICE_ID)}/${encodeURIComponent(TOKEN)}/promo-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ promoCodeId }),
+      });
+      if (!res.ok) throw new Error("echec");
+      await loadData();
+    } catch (e) {
+      alert("Erreur lors de la mise à jour du code promo.");
+    }
+  }
+  const applyPromoBtn = document.getElementById("btn-apply-device-promo");
+  if (applyPromoBtn) {
+    applyPromoBtn.onclick = () => {
+      const input = document.getElementById("device-promo-input");
+      const raw = input.value.trim().toUpperCase();
+      if (!raw) return;
+      const match = allPromoCodes().find(pc => pc.code.toUpperCase() === raw);
+      if (!match) { alert("Code promo invalide."); return; }
+      updateDevicePromoCode(match.id);
     };
   }
+  const removePromoBtn = document.getElementById("btn-remove-device-promo");
+  if (removePromoBtn) removePromoBtn.onclick = () => updateDevicePromoCode(null);
 }
 
 async function handleRefresh() {

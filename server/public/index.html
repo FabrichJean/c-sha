@@ -1001,10 +1001,19 @@ function renderDeviceDetail() {
         ${deviceClient ? `
         <div>
           <div class="hint" style="color:var(--ink-faint)">Code promo (${escapeHtml(deviceClient.name)})</div>
-          <select id="device-client-promo" data-client-id="${deviceClient.id}" style="margin-top:3px;font-size:12.5px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink)">
-            <option value="">— aucun —</option>
-            ${allPromoCodes().map(pc => `<option value="${pc.id}" ${deviceClient.promoCodeId === pc.id ? "selected" : ""}>${escapeHtml(pc.code)} — ${escapeHtml(pc.promotionName)} (÷${pc.divisor})</option>`).join("")}
-          </select>
+          ${(() => {
+            const current = deviceClient.promoCodeId ? allPromoCodes().find(pc => pc.id === deviceClient.promoCodeId) : null;
+            if (current) {
+              return `<div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                <span class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:12px">${escapeHtml(current.code)} (÷${current.divisor})</span>
+                <button class="btn ghost sm" data-remove-client-promo="${deviceClient.id}">Retirer</button>
+              </div>`;
+            }
+            return `<div style="display:flex;gap:6px;margin-top:3px">
+              <input id="device-client-promo-input" data-client-id="${deviceClient.id}" placeholder="CODE" style="width:120px;text-transform:uppercase;font-size:12.5px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink)">
+              <button class="btn sm" id="btn-apply-client-promo">Appliquer</button>
+            </div>`;
+          })()}
         </div>` : ""}
         ${device.firstSeen ? `<div><div class="hint" style="color:var(--ink-faint)">Premier contact</div><div class="mono" style="font-size:13px">${new Date(device.firstSeen).toLocaleDateString("fr-FR")}</div></div>` : ""}
         ${device.lastSeen ? `<div><div class="hint" style="color:var(--ink-faint)">Dernier contact</div><div class="mono" style="font-size:13px">${timeAgo(device.lastSeen)}</div></div>` : ""}
@@ -2242,22 +2251,31 @@ function wireView() {
   const printInvoiceBtn = document.getElementById("btn-print-invoice");
   if (printInvoiceBtn) printInvoiceBtn.onclick = () => window.print();
 
-  const deviceClientPromoSelect = document.getElementById("device-client-promo");
-  if (deviceClientPromoSelect) {
-    deviceClientPromoSelect.onchange = async () => {
-      const clientId = deviceClientPromoSelect.dataset.clientId;
-      const client = state.clients.find(c => c.id === clientId);
-      if (!client) return;
-      try {
-        await api("/api/clients/" + clientId, { method: "PUT", body: JSON.stringify({
-          name: client.name, company: client.company, email: client.email, notes: client.notes,
-          promoCodeId: deviceClientPromoSelect.value || null,
-        }) });
-        toast("Code promo mis à jour");
-        await loadState();
-      } catch (e) { toast("Erreur : " + e.message); }
+  async function updateClientPromoCode(clientId, promoCodeId) {
+    const client = state.clients.find(c => c.id === clientId);
+    if (!client) return;
+    try {
+      await api("/api/clients/" + clientId, { method: "PUT", body: JSON.stringify({
+        name: client.name, company: client.company, email: client.email, notes: client.notes, promoCodeId,
+      }) });
+      toast("Code promo mis à jour");
+      await loadState();
+    } catch (e) { toast("Erreur : " + e.message); }
+  }
+  const applyClientPromoBtn = document.getElementById("btn-apply-client-promo");
+  if (applyClientPromoBtn) {
+    applyClientPromoBtn.onclick = () => {
+      const input = document.getElementById("device-client-promo-input");
+      const raw = input.value.trim().toUpperCase();
+      if (!raw) return;
+      const match = allPromoCodes().find(pc => pc.code.toUpperCase() === raw);
+      if (!match) { toast("Code promo invalide"); return; }
+      updateClientPromoCode(input.dataset.clientId, match.id);
     };
   }
+  document.querySelectorAll("[data-remove-client-promo]").forEach(el => {
+    el.onclick = () => updateClientPromoCode(el.dataset.removeClientPromo, null);
+  });
 
   const addPromotionBtn = document.getElementById("btn-add-promotion");
   if (addPromotionBtn) addPromotionBtn.onclick = () => promotionModal(null);
