@@ -353,6 +353,21 @@ function refreshBanner() {
   </div></div>`;
 }
 
+const INVOICE_STATUS_LABELS = { draft: "Brouillon", sent: "Envoyée", paid: "Payée" };
+const INVOICE_STATUS_COLORS = { draft: "var(--ink-faint)", sent: "var(--warn)", paid: "var(--good)" };
+
+function buildBillingCard() {
+  const b = state.data.billing;
+  if (!b || b.entries.length === 0) return "";
+  return `
+    <div class="card">
+      <div class="trend-head"><h3>Facturation de cet appareil</h3></div>
+      <div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px">
+          <div><div class="il">Total facturé</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px">${fmtUsd(b.totalBilled)}</div></div>
+          <div><div class="il">Payé</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px;color:var(--good)">${fmtUsd(b.totalPaid)}</div></div>
+          <div><div class="il">Restant</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px;color:${b.totalPending > 0 ? "var(--warn)" : "var(--ink-faint)"}">${fmtUsd(b.totalPending)}</div></div>
+        </div>
 function render() {
   if (!state.data) return;
   const d = state.data.device;
