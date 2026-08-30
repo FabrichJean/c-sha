@@ -112,6 +112,8 @@ def main():
     result = {
         "exportedAt": datetime.now(timezone.utc).isoformat(),
         "messageCount": count,
+        "deviceId": args.device_id,
+        "deviceName": args.device_name,
         "projects": out_projects,
     }
 
