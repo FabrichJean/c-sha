@@ -57,6 +57,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=None, help="Limiter aux N derniers jours")
     parser.add_argument("--root", type=str, default=str(CLAUDE_DIR), help="Dossier des logs Claude Code")
+    parser.add_argument("--device-id", type=str, default=None, help="Identifiant de cet appareil (genere par install_autosync.sh)")
+    parser.add_argument("--device-name", type=str, default=None, help="Nom lisible de cet appareil (ex: nom de la machine)")
     args = parser.parse_args()
 
     root = Path(args.root)
