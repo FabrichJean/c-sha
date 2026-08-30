@@ -62,19 +62,32 @@ python3 configure_sync.py    # colle l'URL du serveur + la cle API de sync (une 
 python3 install_autosync.py  # programme la synchro (une fois)
 ```
 
-Sur Windows, remplace `python3` par `python`. `install_autosync.py` détecte
-l'OS et utilise le planificateur natif :
+Sur Windows, remplace `python3` par `python`. `install_autosync.py` installe un
+**processus persistant** (`ledger_agent.py daemon`), supervisé par le
+planificateur natif de l'OS (qui le relance s'il s'arrête) :
 
-- **macOS** : LaunchAgent (`launchd`) — les scripts sont copiés dans
-  `~/Library/Application Support/Ledger/` car `launchd` ne peut pas accéder
-  aux fichiers sous `~/Documents` (protection TCC).
-- **Linux** : entrée `crontab` (vérification chaque minute).
-- **Windows** : tâche planifiée (`schtasks`, nom `LedgerTokenSync`).
+- **macOS** : LaunchAgent (`launchd`, `KeepAlive`) — les fichiers sont copiés
+  dans `~/Library/Application Support/Ledger/` car `launchd` ne peut pas
+  accéder aux fichiers sous `~/Documents` (protection TCC).
+- **Linux** : service `systemd --user` (`ledger-tokensync.service`,
+  `Restart=always`). Si `systemd --user` n'est pas disponible (certains
+  conteneurs/VPS minimalistes), repli automatique sur une entrée `crontab`
+  classique (latence jusqu'à ~60s au lieu de quasi instantané).
+- **Windows** : tâche planifiée (`schtasks`, déclenchement à l'ouverture de
+  session + démarrage immédiat après l'installation, nom `LedgerTokenSync`).
 
-`sync_usage.py` lit ensuite `~/.claude/projects/**/*.jsonl`, agrège les tokens
-et les pousse directement sur `POST /api/sync` du serveur — sans presse-papiers,
-sans copier-coller, sans navigateur ouvert. Config et logs dans `~/.ledger/`
-(identique sur les trois OS). Pour désinstaller : `python3 uninstall_autosync.py`.
+Le daemon reste connecté au serveur via **long-polling**
+(`GET /api/sync-wait`, sondage interne toutes les 500ms côté serveur) : le
+bouton "Rafraîchir" du CRM déclenche une synchro en moins d'une seconde au
+lieu d'attendre jusqu'à 60s le prochain passage planifié. En dehors d'une
+demande explicite, un push automatique a lieu toutes les 4h. Il lit
+`~/.claude/projects/**/*.jsonl`, agrège les tokens et les pousse directement
+sur `POST /api/sync` — sans presse-papiers, sans copier-coller, sans
+navigateur ouvert. Config et logs dans `~/.ledger/` (identique sur les trois
+OS). Pour désinstaller : `python3 uninstall_autosync.py`.
+
+Pour une synchro ponctuelle manuelle (sans passer par le daemon) :
+`python3 sync_usage.py`.
 
 ### Sans Python installé
 

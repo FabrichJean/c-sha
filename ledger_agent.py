@@ -7,22 +7,24 @@ Releases du depot.
 
 Usage (binaire) :
     ledger-agent configure   # equivalent de configure_sync.py
-    ledger-agent sync        # equivalent de sync_usage.py
-    ledger-agent install     # equivalent de install_autosync.py
+    ledger-agent sync        # synchro ponctuelle (debug/manuel)
+    ledger-agent daemon      # processus persistant : long-polling, quasi temps reel
+    ledger-agent install     # equivalent de install_autosync.py (installe le daemon)
     ledger-agent uninstall   # equivalent de uninstall_autosync.py
 
 Usage (depuis les sources, identique) :
-    python3 ledger_agent.py sync
+    python3 ledger_agent.py daemon
 """
 from __future__ import annotations
 
 import argparse
 import sys
 
-from ledger_core import main_configure, main_install, main_sync, main_uninstall
+from ledger_core import main_configure, main_daemon, main_install, main_sync, main_uninstall
 
 COMMANDS = {
     "sync": main_sync,
+    "daemon": main_daemon,
     "configure": main_configure,
     "install": main_install,
     "uninstall": main_uninstall,

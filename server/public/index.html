@@ -553,7 +553,7 @@ async function loadState() {
 }
 
 function agentStatus() {
-  // l'agent local interroge /api/sync-status toutes les 60s quand il tourne
+  // l'agent local (daemon) reste connecte via long-polling (/api/sync-wait, ~500ms de latence)
   if (!state.agentLastSeen) return { seen: false, label: "jamais détecté" };
   const secAgo = (Date.now() - new Date(state.agentLastSeen).getTime()) / 1000;
   if (secAgo < 150) return { seen: true, secAgo, label: `actif (vu il y a ${Math.round(secAgo)}s)` };
@@ -1545,7 +1545,7 @@ function renderImport() {
   const agent = agentStatus();
   const agentCard = `
     <div class="card">
-      <div class="card-head"><h3>Agent local</h3><span class="hint">interroge ce serveur toutes les 60s</span></div>
+      <div class="card-head"><h3>Agent local</h3><span class="hint">processus persistant, connexion en temps quasi réel</span></div>
       <div class="card-body" style="display:flex;align-items:center;gap:10px">
         <span class="dot" style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${agent.seen ? "var(--good)" : "var(--warn)"}"></span>
         <div>
@@ -1580,7 +1580,7 @@ function renderImport() {
     <div class="card">
       <div class="card-head"><h3>Comment ça marche</h3></div>
       <div class="card-body">
-        <p style="margin:0 0 10px;color:var(--ink-dim)">Sur ta machine, un planificateur natif (launchd sur Mac, cron sur Linux, Planificateur de tâches sur Windows) exécute <code class="k">sync_usage.py</code> toutes les minutes. Il lit tes logs Claude Code locaux et pousse le résultat ici dès qu'une synchro est due :</p>
+        <p style="margin:0 0 10px;color:var(--ink-dim)">Sur ta machine, un processus persistant (<code class="k">ledger_agent.py daemon</code>, supervisé par launchd/systemd/Planificateur de tâches) reste connecté au serveur en long-polling. Il lit tes logs Claude Code locaux et pousse le résultat ici en moins d'une seconde après un clic sur "Rafraîchir", ou automatiquement toutes les 4h :</p>
         <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">python3 configure_sync.py
 python3 install_autosync.py</pre>
         <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Fonctionne à l'identique sur Windows, macOS et Linux (Python standard, aucune dépendance). Rien à faire de ton côté une fois installé — cette page se met à jour toute seule.</p>

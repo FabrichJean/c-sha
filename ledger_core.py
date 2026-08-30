@@ -146,6 +146,50 @@ def main_sync() -> int:
     return 0
 
 
+SYNC_WAIT_TIMEOUT_MS = 28000  # cote serveur, cap a 30s (voir server.js) ; on reste un peu en dessous
+SYNC_WAIT_HTTP_TIMEOUT = 35  # doit depasser SYNC_WAIT_TIMEOUT_MS pour laisser le long-poll repondre normalement
+SYNC_WAIT_ERROR_BACKOFF = 10
+
+
+def main_daemon() -> int:
+    """Processus persistant (supervise par launchd/systemd/Task Scheduler) : reste
+    connecte au serveur via long-polling (/api/sync-wait) pour reagir en quasi
+    temps reel au bouton 'Rafraichir', sans dependre du plancher a 1 minute des
+    planificateurs OS. Remplace l'ancien modele 'relance toutes les 60s'."""
+    log("daemon demarre")
+    while True:
+        config = load_json(CONFIG_FILE)
+        if not config or not config.get("url") or not config.get("apiKey"):
+            time.sleep(5)
+            continue
+
+        device = ensure_device()
+        base = config["url"].rstrip("/")
+        interval = config.get("syncIntervalSeconds", SYNC_INTERVAL_SECONDS)
+
+        try:
+            qs = urllib.parse.urlencode({
+                "deviceId": device["id"],
+                "deviceName": device["name"],
+                "timeoutMs": SYNC_WAIT_TIMEOUT_MS,
+            })
+            _, resp = http_call("GET", f"{base}/api/sync-wait?{qs}", config["apiKey"], timeout=SYNC_WAIT_HTTP_TIMEOUT)
+        except Exception as e:
+            log(f"echec long-poll : {e}")
+            time.sleep(SYNC_WAIT_ERROR_BACKOFF)
+            continue
+
+        if resp.get("requested"):
+            do_sync(config, device, "demande depuis le CRM (long-poll)")
+            continue  # on relance tout de suite le long-poll, pas d'attente
+
+        state = load_json(STATE_FILE, {}) or {}
+        last = state.get("lastSyncAt", 0)
+        if time.time() - last >= interval:
+            do_sync(config, device, "intervalle automatique")
+        # sinon : le long-poll a deja consomme jusqu'a ~28s, on reboucle directement
+
+
 def main_configure() -> int:
     # LEDGER_URL / LEDGER_SYNC_API_KEY permettent une configuration non-interactive
     # (scripts d'installation, terminaux sans TTY reel comme certains panels web
@@ -180,29 +224,32 @@ def main_configure() -> int:
     return 1
 
 
-def _sync_command_args() -> list[str]:
-    """Commande a enregistrer dans le planificateur pour declencher 'sync'."""
-    if is_frozen():
-        return [sys.executable, "sync"]
-    script_dir = Path(__file__).resolve().parent
-    return [sys.executable, str(script_dir / "sync_usage.py")]
+SYSTEMD_UNIT_NAME = "ledger-tokensync.service"
 
 
-def install_mac() -> None:
-    agent_dir = Path.home() / "Library" / "Application Support" / "Ledger" / "agent"
+def _agent_files_dir() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _install_agent_copy(agent_dir: Path) -> list[str]:
+    """Copie les fichiers necessaires au daemon dans agent_dir (hors du repo,
+    cf. restriction TCC macOS sur ~/Documents) et renvoie la commande a lancer."""
     agent_dir.mkdir(parents=True, exist_ok=True)
-
     if is_frozen():
         binary_path = Path(sys.executable)
         target = agent_dir / binary_path.name
         shutil.copy(binary_path, target)
         target.chmod(0o755)
-        program_args = [str(target), "sync"]
-    else:
-        script_dir = Path(__file__).resolve().parent
-        for name in ("export_usage.py", "sync_usage.py"):
-            shutil.copy(script_dir / name, agent_dir / name)
-        program_args = [sys.executable, str(agent_dir / "sync_usage.py")]
+        return [str(target), "daemon"]
+    script_dir = _agent_files_dir()
+    for name in ("export_usage.py", "ledger_core.py", "ledger_agent.py", "sync_usage.py", "configure_sync.py"):
+        shutil.copy(script_dir / name, agent_dir / name)
+    return [sys.executable, str(agent_dir / "ledger_agent.py"), "daemon"]
+
+
+def install_mac() -> None:
+    agent_dir = Path.home() / "Library" / "Application Support" / "Ledger" / "agent"
+    program_args = _install_agent_copy(agent_dir)
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     plist_path = Path.home() / "Library" / "LaunchAgents" / f"{LABEL}.plist"
@@ -217,9 +264,9 @@ def install_mac() -> None:
   <key>ProgramArguments</key>
   <array>
 {args_xml}  </array>
-  <key>StartInterval</key>
-  <integer>60</integer>
   <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
   <string>{LOG_DIR / "launchd.out.log"}</string>
@@ -231,14 +278,61 @@ def install_mac() -> None:
     plist_path.write_text(plist, encoding="utf-8")
     subprocess.run(["launchctl", "unload", str(plist_path)], capture_output=True)
     subprocess.run(["launchctl", "load", str(plist_path)], check=True)
-    print(f"Synchro automatique installee (macOS, launchd : {LABEL}).")
+    print(f"Synchro automatique installee (macOS, launchd, processus persistant : {LABEL}).")
     print(f"Fichiers de l'agent : {agent_dir}")
+
+
+def _systemd_available() -> bool:
+    if not shutil.which("systemctl"):
+        return False
+    # 'systemctl --user' a besoin d'un bus de session utilisateur — absent sur
+    # certains VPS/conteneurs minimalistes meme quand systemd est installe.
+    probe = subprocess.run(["systemctl", "--user", "status"], capture_output=True, text=True)
+    return probe.returncode in (0, 3)  # 3 = systemd repond mais aucune unite dans cet etat
 
 
 def install_linux() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    if _systemd_available():
+        agent_dir = Path.home() / ".ledger" / "agent"
+        program_args = _install_agent_copy(agent_dir)
+        exec_start = " ".join(program_args)
+        unit_dir = Path.home() / ".config" / "systemd" / "user"
+        unit_dir.mkdir(parents=True, exist_ok=True)
+        unit_path = unit_dir / SYSTEMD_UNIT_NAME
+        unit_path.write_text(f"""[Unit]
+Description=Ledger token sync agent
+
+[Service]
+ExecStart={exec_start}
+Restart=always
+RestartSec=5
+StandardOutput=append:{LOG_DIR / "daemon.out.log"}
+StandardError=append:{LOG_DIR / "daemon.err.log"}
+
+[Install]
+WantedBy=default.target
+""", encoding="utf-8")
+        subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+        subprocess.run(["systemctl", "--user", "enable", "--now", SYSTEMD_UNIT_NAME], check=True)
+        # Permet au service de tourner meme sans session graphique/SSH active (VPS).
+        # Peut echouer sans privilege suffisant — non bloquant, juste informatif.
+        linger = subprocess.run(["loginctl", "enable-linger", os.environ.get("USER", "")], capture_output=True, text=True)
+        print(f"Synchro automatique installee (Linux, systemd --user, processus persistant : {SYSTEMD_UNIT_NAME}).")
+        if linger.returncode != 0:
+            print("Note : 'loginctl enable-linger' a echoue (permissions) — le service peut s'arreter a la deconnexion SSH.", file=sys.stderr)
+            print("Demande a un admin de lancer : sudo loginctl enable-linger " + os.environ.get("USER", "<utilisateur>"), file=sys.stderr)
+        print("Verifie avec : systemctl --user status " + SYSTEMD_UNIT_NAME)
+        return
+
+    # repli sans systemd : ancien modele par intervalle (latence jusqu'a ~60s)
+    print("systemd --user indisponible sur cette machine — repli sur cron (latence jusqu'a ~60s au lieu de quasi instantane).", file=sys.stderr)
     cron_log = LOG_DIR / "cron.log"
-    cmd = _sync_command_args()
+    if is_frozen():
+        cmd = [sys.executable, "sync"]
+    else:
+        cmd = [sys.executable, str(_agent_files_dir() / "sync_usage.py")]
     cron_line = f"* * * * * {' '.join(cmd)} >> {cron_log} 2>&1"
 
     existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
@@ -256,25 +350,28 @@ def install_linux() -> None:
 def install_windows() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     if is_frozen():
-        cmd_parts = [sys.executable, "sync"]
+        program_args = [sys.executable, "daemon"]
     else:
         python_exe = shutil.which("pythonw") or sys.executable
-        script_dir = Path(__file__).resolve().parent
-        cmd_parts = [python_exe, str(script_dir / "sync_usage.py")]
-    tr = " ".join(f'"{p}"' for p in cmd_parts)
+        program_args = [python_exe, str(_agent_files_dir() / "ledger_agent.py"), "daemon"]
+    tr = " ".join(f'"{p}"' for p in program_args)
+    subprocess.run(["schtasks", "/End", "/TN", WINDOWS_TASK_NAME], capture_output=True)
     subprocess.run(["schtasks", "/Delete", "/TN", WINDOWS_TASK_NAME, "/F"], capture_output=True)
     cmd = [
         "schtasks", "/Create",
-        "/SC", "MINUTE", "/MO", "1",
+        "/SC", "ONLOGON",
         "/TN", WINDOWS_TASK_NAME,
         "/TR", tr,
+        "/RL", "LIMITED",
         "/F",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print(f"Echec de l'installation (schtasks) : {result.stderr.strip()}", file=sys.stderr)
         sys.exit(1)
-    print(f"Synchro automatique installee (Windows, tache planifiee : {WINDOWS_TASK_NAME}).")
+    # demarre tout de suite, sans attendre la prochaine ouverture de session
+    subprocess.run(["schtasks", "/Run", "/TN", WINDOWS_TASK_NAME], capture_output=True)
+    print(f"Synchro automatique installee (Windows, tache planifiee, processus persistant : {WINDOWS_TASK_NAME}).")
     print("Verifie avec : schtasks /Query /TN " + WINDOWS_TASK_NAME)
 
 
@@ -288,9 +385,9 @@ def main_install() -> int:
         install_windows()
     else:
         print(f"OS non reconnu automatiquement : {system}", file=sys.stderr)
-        print("Lance sync_usage.py toi-meme via ton propre planificateur (toutes les 1-5 min).", file=sys.stderr)
+        print("Lance 'ledger_agent.py daemon' toi-meme, supervise par ton propre outil (systemd, supervisord...).", file=sys.stderr)
         return 1
-    print("Check toutes les 60s (ou chaque minute) ; push reel toutes les 4h ou sur demande depuis le CRM.")
+    print("Processus persistant : reagit en quasi temps reel au bouton \"Rafraichir\" (long-polling) ; push automatique toutes les 4h sinon.")
     print(f"Config attendue dans : {CONFIG_FILE} (voir configure_sync.py / 'ledger_agent configure')")
     print("Pour desinstaller : python3 uninstall_autosync.py (ou 'ledger_agent uninstall')")
     return 0
@@ -306,16 +403,23 @@ def uninstall_mac() -> None:
 
 
 def uninstall_linux() -> None:
+    if shutil.which("systemctl"):
+        subprocess.run(["systemctl", "--user", "disable", "--now", SYSTEMD_UNIT_NAME], capture_output=True)
+        unit_path = Path.home() / ".config" / "systemd" / "user" / SYSTEMD_UNIT_NAME
+        unit_path.unlink(missing_ok=True)
+        subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+    agent_dir = Path.home() / ".ledger" / "agent"
+    shutil.rmtree(agent_dir, ignore_errors=True)
+
     existing = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
-    if existing.returncode != 0:
-        print("Aucune crontab existante.")
-        return
-    lines = [l for l in existing.stdout.splitlines() if "sync_usage.py" not in l and "ledger_agent" not in l]
-    subprocess.run(["crontab", "-"], input="\n".join(lines) + ("\n" if lines else ""), text=True)
-    print("Synchro automatique desinstallee (Linux, entree crontab retiree).")
+    if existing.returncode == 0:
+        lines = [l for l in existing.stdout.splitlines() if "sync_usage.py" not in l and "ledger_agent" not in l]
+        subprocess.run(["crontab", "-"], input="\n".join(lines) + ("\n" if lines else ""), text=True)
+    print("Synchro automatique desinstallee (Linux).")
 
 
 def uninstall_windows() -> None:
+    subprocess.run(["schtasks", "/End", "/TN", WINDOWS_TASK_NAME], capture_output=True)
     result = subprocess.run(["schtasks", "/Delete", "/TN", WINDOWS_TASK_NAME, "/F"], capture_output=True, text=True)
     if result.returncode == 0:
         print("Synchro automatique desinstallee (Windows).")
