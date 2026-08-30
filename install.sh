@@ -36,8 +36,19 @@ chmod +x "$DEST_DIR/ledger-agent"
 echo "Binaire installe : $DEST_DIR/ledger-agent"
 echo
 
-"$DEST_DIR/ledger-agent" configure
-"$DEST_DIR/ledger-agent" install
-
-echo
-echo "Termine. Pour desinstaller : $DEST_DIR/ledger-agent uninstall"
+# Ce script est presque toujours lance via 'curl ... | bash' : dans ce cas,
+# stdin est deja consomme par le pipe (c'est le script lui-meme), donc les
+# prompts interactifs de 'configure' liraient EOF immediatement. On relit le
+# terminal directement via /dev/tty quand c'est possible.
+if exec 3</dev/tty 2>/dev/null; then
+  exec 3<&-
+  "$DEST_DIR/ledger-agent" configure < /dev/tty
+  "$DEST_DIR/ledger-agent" install
+  echo
+  echo "Termine. Pour resynchroniser/desinstaller : $DEST_DIR/ledger-agent sync|uninstall"
+else
+  echo "Aucun terminal interactif detecte (ex: SSH non-tty, script automatise)."
+  echo "Termine la configuration a la main :"
+  echo "  $DEST_DIR/ledger-agent configure"
+  echo "  $DEST_DIR/ledger-agent install"
+fi
