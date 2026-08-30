@@ -1855,6 +1855,14 @@ function wireView() {
   document.querySelectorAll("[data-quick-invoice-status]").forEach(el => {
     el.onclick = (e) => e.stopPropagation();
     el.onchange = async (e) => {
+      e.stopPropagation();
+      try {
+        await api("/api/invoices/" + el.dataset.quickInvoiceStatus, { method: "PUT", body: JSON.stringify({ status: el.value }) });
+        toast("Statut mis à jour");
+        await loadState();
+      } catch (err) { toast("Erreur : " + err.message); }
+    };
+  });
   document.querySelectorAll("[data-set-invoice-status]").forEach(el => {
     el.onclick = async () => {
       try {
