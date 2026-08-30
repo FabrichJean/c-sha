@@ -25,11 +25,22 @@ db.exec(`
     client_id TEXT,
     project_keys TEXT NOT NULL DEFAULT '[]',
     rate REAL,
+    billing_mode TEXT NOT NULL DEFAULT 'tokens',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
   );
 
+  CREATE TABLE IF NOT EXISTS invoices (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    total REAL NOT NULL DEFAULT 0,
+    line_items TEXT NOT NULL DEFAULT '[]',
+    notes TEXT,
+    created_at TEXT NOT NULL,
   CREATE TABLE IF NOT EXISTS usage_entries (
     id TEXT PRIMARY KEY,
     project_key TEXT NOT NULL,
