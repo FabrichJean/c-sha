@@ -1182,6 +1182,36 @@ function renderInvoiceDetail() {
         <div style="display:flex;gap:28px;flex-wrap:wrap">
           <div><div class="hint" style="color:var(--ink-faint)">Client</div><div style="font-size:14px;font-weight:620">${escapeHtml(client ? client.name : "—")}</div></div>
           <div><div class="hint" style="color:var(--ink-faint)">Société</div><div style="font-size:14px">${escapeHtml((client && client.company) || "—")}</div></div>
+          <div><div class="hint" style="color:var(--ink-faint)">Émise le</div><div class="mono" style="font-size:14px">${new Date(inv.createdAt).toLocaleDateString("fr-FR")}</div></div>
+        </div>
+        <div class="tabs">
+          ${["draft", "sent", "paid"].map(s => `<button data-set-invoice-status="${s}" class="${inv.status === s ? "active" : ""}">${INVOICE_STATUS_LABELS[s]}</button>`).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Détail</h3></div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Projet</th><th>Mode</th><th class="num">Détail</th><th class="num">Montant</th></tr></thead>
+          <tbody>
+            ${inv.lineItems.map(l => `<tr>
+              <td>${escapeHtml(l.projectName)}</td>
+              <td class="hint">${l.billingMode === "hourly" ? "Taux horaire" : "Coût tokens"}</td>
+              <td class="num mono">${l.billingMode === "hourly" ? `${l.hours} h × $${l.rate}` : `${fmtCompact(l.tokens)} tok`}</td>
+              <td class="num mono">${fmtUsd(l.amount)}</td>
+            </tr>`).join("")}
+          </tbody>
+          <tfoot>
+            <tr><td colspan="3" style="text-align:right;font-weight:650;padding:12px 10px">Total</td><td class="num mono" style="font-weight:650;font-size:15px">${fmtUsd(inv.total)}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
 /* ---- devices ---- */
 function deviceStatus(device) {
   if (!device.lastSeen) return { seen: false, historic: true, label: "Historique" };
@@ -1414,6 +1444,12 @@ function projectModal(existing, presetKey) {
       <div class="field"><label>Nom du projet</label><input id="m-name" value="${escapeHtml(p.name || presetKey || "")}" placeholder="Refonte du site vitrine"></div>
       <div class="field"><label>Client</label><select id="m-client"><option value="">— aucun —</option>${clientOptions}</select></div>
       <div class="field"><label>Clés de dossier liées (une par ligne — nom du dossier local)</label><textarea id="m-keys" style="min-height:70px;font-family:'IBM Plex Mono',monospace">${escapeHtml((p.projectKeys || (presetKey ? [presetKey] : [])).join("\n"))}</textarea></div>
+      <div class="field"><label>Mode de facturation</label>
+        <select id="m-billing-mode">
+          <option value="tokens" ${(p.billingMode || "tokens") === "tokens" ? "selected" : ""}>Coût des tokens</option>
+          <option value="hourly" ${p.billingMode === "hourly" ? "selected" : ""}>Taux horaire</option>
+        </select>
+      </div>
       <div class="field"><label>Taux horaire facturé ($/h, optionnel)</label><input id="m-rate" type="number" step="1" value="${p.rate || ""}" placeholder="150"></div>
     </div>
     <div class="mf"><button class="btn ghost" id="m-cancel">Annuler</button><button class="btn primary" id="m-save">Enregistrer</button></div>
@@ -1428,6 +1464,7 @@ function projectModal(existing, presetKey) {
       clientId: document.getElementById("m-client").value || null,
       projectKeys: keys,
       rate: parseFloat(document.getElementById("m-rate").value) || null,
+      billingMode: document.getElementById("m-billing-mode").value,
     };
     try {
       if (existing) await api("/api/projects/" + existing.id, { method: "PUT", body: JSON.stringify(data) });
@@ -1637,6 +1674,33 @@ function wireView() {
     };
   });
   document.querySelectorAll("[data-quick-link]").forEach(el => { el.onclick = () => projectModal(null, el.dataset.quickLink); });
+
+  const addInvoiceBtn = document.getElementById("btn-add-invoice");
+  if (addInvoiceBtn) addInvoiceBtn.onclick = () => invoiceModal();
+  document.querySelectorAll("[data-view-invoice]").forEach(el => {
+    el.onclick = () => { state.selectedInvoiceId = el.dataset.viewInvoice; state.view = "invoice-detail"; render(); };
+  });
+  document.querySelectorAll("[data-del-invoice]").forEach(el => {
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      try {
+        await api("/api/invoices/" + el.dataset.delInvoice, { method: "DELETE" });
+        toast("Facture supprimée");
+        if (state.view === "invoice-detail") state.view = "invoices";
+        await loadState();
+      } catch (err) { toast("Erreur : " + err.message); }
+    };
+  });
+  document.querySelectorAll("[data-set-invoice-status]").forEach(el => {
+    el.onclick = async () => {
+      try {
+        await api("/api/invoices/" + state.selectedInvoiceId, { method: "PUT", body: JSON.stringify({ status: el.dataset.setInvoiceStatus }) });
+        await loadState();
+      } catch (err) { toast("Erreur : " + err.message); }
+    };
+  });
+  const printInvoiceBtn = document.getElementById("btn-print-invoice");
+  if (printInvoiceBtn) printInvoiceBtn.onclick = () => window.print();
 
   document.querySelectorAll("[data-view-device]").forEach(el => {
     el.onclick = () => { state.selectedDeviceId = el.dataset.viewDevice; state.view = "device-detail"; render(); };
