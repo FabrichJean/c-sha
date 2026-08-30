@@ -236,6 +236,15 @@ function getDeviceDailyRows(deviceId) {
   return rows;
 }
 
+/* suivi de facturation pour UN appareil : ne retient que la part de chaque
+   facture qui le concerne (ligne "appareil" ou "montant personnalise" plafonne
+   sur lui) — jamais le nom du client, pour rester sans danger sur un lien public */
+function getDeviceBillingSummary(deviceId) {
+  const invoices = db.prepare("SELECT id, status, line_items, created_at FROM invoices ORDER BY created_at DESC").all();
+  const entries = [];
+  for (const inv of invoices) {
+    let items;
+    try { items = JSON.parse(inv.line_items || "[]"); } catch (e) { items = []; }
 app.get("/api/device-view/:deviceId/:token", requireDeviceToken, (req, res) => {
   const d = db.prepare("SELECT * FROM devices WHERE id = ?").get(req.params.deviceId);
   const lastDataRow = db.prepare("SELECT MAX(imported_at) at FROM usage_entries WHERE device_id = ?").get(req.params.deviceId);
