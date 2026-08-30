@@ -405,6 +405,17 @@ function refreshBanner() {
   </div></div>`;
 }
 
+function allPromoCodes() {
+  const promotions = (state.data && state.data.promotions) || [];
+  return promotions.flatMap(p => p.codes.map(c => ({ id: c.id, code: c.code, promotionName: p.name, divisor: p.divisor })));
+}
+
+function buildPromoCodeItem() {
+  if (!state.data.hasClient) return "";
+  const options = allPromoCodes().map(pc => `<option value="${pc.id}" ${state.data.currentPromoCodeId === pc.id ? "selected" : ""}>${escapeHtml(pc.code)} — ${escapeHtml(pc.promotionName)} (÷${pc.divisor})</option>`).join("");
+  return `<div class="info-item"><div class="il">Code promo</div><select id="device-promo-select" class="period-select" style="margin-top:3px"><option value="">— aucun —</option>${options}</select></div>`;
+}
+
 const INVOICE_STATUS_LABELS = { draft: "Brouillon", sent: "Envoyée", paid: "Payée" };
 const INVOICE_STATUS_COLORS = { draft: "var(--ink-faint)", sent: "var(--warn)", paid: "var(--good)" };
 
@@ -455,6 +466,7 @@ function render() {
       ${d.firstSeen ? `<div class="info-item"><div class="il">Premier contact</div><div class="iv">${new Date(d.firstSeen).toLocaleDateString("fr-FR")}</div></div>` : ""}
       ${d.lastSeen ? `<div class="info-item"><div class="il">Dernier contact</div><div class="iv">${timeAgo(d.lastSeen)}</div></div>` : ""}
       <div class="info-item"><div class="il">Dernière donnée reçue</div><div class="iv">${state.data.lastDataAt ? timeAgo(state.data.lastDataAt) : "—"}</div></div>
+      ${buildPromoCodeItem()}
     </div></div>
     ${buildBillingCard(deviceTotalCost)}
     ${refreshBanner()}
@@ -605,6 +617,23 @@ function wire() {
   if (detailPagePrev) detailPagePrev.onclick = () => { state.detailPage = Math.max(0, state.detailPage - 1); render(); };
   const detailPageNext = document.getElementById("detail-page-next");
   if (detailPageNext) detailPageNext.onclick = () => { state.detailPage++; render(); };
+
+  const promoSelect = document.getElementById("device-promo-select");
+  if (promoSelect) {
+    promoSelect.onchange = async () => {
+      try {
+        const res = await fetch(`/api/device-view/${encodeURIComponent(DEVICE_ID)}/${encodeURIComponent(TOKEN)}/promo-code`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ promoCodeId: promoSelect.value || null }),
+        });
+        if (!res.ok) throw new Error("echec");
+        await loadData();
+      } catch (e) {
+        alert("Erreur lors de la mise à jour du code promo.");
+      }
+    };
+  }
 }
 
 async function handleRefresh() {
