@@ -54,8 +54,8 @@ Fais-le tourner avec `pm2`, `systemd` ou équivalent pour qu'il redémarre tout 
 ## Brancher la synchro automatique locale
 
 Cross-platform (Windows / macOS / Linux, Python standard uniquement — aucune
-dépendance à installer). Une fois le serveur en ligne, sur ta machine (à la
-racine du projet, pas dans `server/`) :
+dépendance à installer). Une fois le serveur en ligne, sur ta machine, dans le
+dossier `agent/` du projet (pas dans `server/`) :
 
 ```bash
 python3 configure_sync.py    # colle l'URL du serveur + la cle API de sync (une fois)
@@ -100,13 +100,13 @@ le stdin du script, et sur certains terminaux sans vrai TTY (panels web,
 ```bash
 # macOS / Linux
 LEDGER_URL="https://ton-serveur" LEDGER_SYNC_API_KEY="ta_cle" \
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.sh)"
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/agent/install.sh)"
 ```
 
 ```powershell
 # Windows (PowerShell)
 $env:LEDGER_URL = "https://ton-serveur"; $env:LEDGER_SYNC_API_KEY = "ta_cle"
-irm https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/FabrichJean/c-sha/main/agent/install.ps1 | iex
 ```
 
 Sans ces variables, le script télécharge quand même le binaire mais n'essaie
