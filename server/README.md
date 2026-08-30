@@ -78,19 +78,25 @@ sans copier-coller, sans navigateur ouvert. Config et logs dans `~/.ledger/`
 
 ### Sans Python installé
 
-Télécharge le binaire correspondant à ton OS depuis la page **Releases** du
-dépôt GitHub (`ledger-agent-macos`, `ledger-agent-linux`, `ledger-agent-windows.exe`)
-— aucune dépendance à installer. Il regroupe les mêmes commandes :
+Une seule commande télécharge le binaire de la dernière Release GitHub
+correspondant à l'OS courant et lance directement `configure` puis `install` :
 
 ```bash
-./ledger-agent-macos configure   # equivalent de configure_sync.py
-./ledger-agent-macos install     # equivalent de install_autosync.py
-./ledger-agent-macos uninstall   # equivalent de uninstall_autosync.py
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.sh | bash
 ```
 
-Sur macOS/Linux, rends-le exécutable avant le premier lancement :
-`chmod +x ledger-agent-macos`. Les binaires sont générés automatiquement par
-`.github/workflows/release.yml` à chaque tag `v*` poussé sur le dépôt.
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.ps1 | iex
+```
+
+Le binaire est installé dans `~/.ledger/bin/` (`%USERPROFILE%\.ledger\bin\` sur
+Windows). Pour resynchroniser/désinstaller ensuite : `~/.ledger/bin/ledger-agent
+sync|uninstall`. Les binaires (`ledger-agent-macos`, `ledger-agent-linux`,
+`ledger-agent-windows.exe`) sont générés automatiquement par
+`.github/workflows/release.yml` à chaque tag `v*` poussé sur le dépôt — il faut
+qu'au moins une release existe avant de lancer ces scripts.
 
 ## Variables d'environnement
 
