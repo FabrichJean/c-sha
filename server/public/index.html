@@ -1019,6 +1019,14 @@ function computeTokenCostForProject(project, periodStart, periodEnd) {
   };
 }
 
+function computeTokenCostForDevice(deviceId, periodStart, periodEnd) {
+  const rows = allDailyRows().filter(r => r.deviceId === deviceId && r.date >= periodStart && r.date <= periodEnd);
+  return {
+    tokens: rows.reduce((s, r) => s + totalTokens(r), 0),
+    cost: rows.reduce((s, r) => s + costOf(r.model, r), 0),
+  };
+}
+
 function renderInvoices() {
   const rows = state.invoices.slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   return `
@@ -1051,6 +1059,8 @@ function renderInvoices() {
 function invoiceModal() {
   const clientOptions = state.clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   const defaultMonth = new Date().toISOString().slice(0, 7);
+  let extraDeviceIds = [];
+
   openModal(`
     <div class="mh">Nouvelle facture</div>
     <div class="mb">
@@ -1059,6 +1069,7 @@ function invoiceModal() {
         <div class="field"><label>Mois</label><input id="m-inv-month" type="month" value="${defaultMonth}"></div>
       </div>
       <div id="m-inv-lines"><div class="hint" style="color:var(--ink-faint);padding:10px 0">Choisis un client pour voir ses projets.</div></div>
+      <div id="m-inv-devices"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border);margin-top:6px">
         <strong>Total</strong><strong class="mono" id="m-inv-total">$0.00</strong>
       </div>
@@ -1071,6 +1082,51 @@ function invoiceModal() {
     const clientId = document.getElementById("m-inv-client").value;
     const projects = state.projects.filter(p => p.clientId === clientId);
     return { clientId, projects };
+  }
+  function currentPeriod() {
+    return monthBounds(document.getElementById("m-inv-month").value);
+  }
+
+  function renderDeviceSection() {
+    const { clientId } = currentLines();
+    const devicesEl = document.getElementById("m-inv-devices");
+    if (!clientId) { devicesEl.innerHTML = ""; return; }
+    const { start, end } = currentPeriod();
+    const available = state.devices.filter(d => d.id !== "legacy" && !extraDeviceIds.includes(d.id));
+    const rowsHtml = extraDeviceIds.map(id => {
+      const device = state.devices.find(d => d.id === id);
+      if (!device) return "";
+      const { tokens, cost } = computeTokenCostForDevice(id, start, end);
+      return `<tr>
+        <td>${escapeHtml(device.name)}</td>
+        <td class="hint">Appareil</td>
+        <td class="num mono">${fmtCompact(tokens)} tok</td>
+        <td class="num mono" id="m-line-amount-device-${id}" data-fixed-amount="${cost}">${fmtUsd(cost)}</td>
+        <td style="text-align:right"><button class="btn ghost sm" data-remove-device-line="${id}">✕</button></td>
+      </tr>`;
+    }).join("");
+    devicesEl.innerHTML = `
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <label style="font-size:12px;font-weight:600;color:var(--ink-dim)">Appareils facturés (conso totale, hors projets)</label>
+        ${extraDeviceIds.length ? `<table style="margin-top:8px"><tbody>${rowsHtml}</tbody></table>` : `<div class="hint" style="color:var(--ink-faint);padding:8px 0;font-size:12.5px">Aucun appareil ajouté.</div>`}
+        ${available.length ? `
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <select id="m-inv-device-select" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink)">
+            ${available.map(d => `<option value="${d.id}">${escapeHtml(d.name)}</option>`).join("")}
+          </select>
+          <button class="btn sm" id="btn-add-device-line">+ Ajouter</button>
+        </div>` : ""}
+      </div>`;
+    devicesEl.querySelectorAll("[data-remove-device-line]").forEach(btn => {
+      btn.onclick = () => { extraDeviceIds = extraDeviceIds.filter(id => id !== btn.dataset.removeDeviceLine); renderDeviceSection(); updateTotal(); };
+    });
+    const addBtn = document.getElementById("btn-add-device-line");
+    if (addBtn) addBtn.onclick = () => {
+      const sel = document.getElementById("m-inv-device-select");
+      if (sel.value) extraDeviceIds.push(sel.value);
+      renderDeviceSection();
+      updateTotal();
+    };
   }
 
   function recomputeLines() {
