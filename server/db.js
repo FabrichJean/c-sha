@@ -90,6 +90,10 @@ if (!projectCols.includes("billing_mode")) {
 }
 
 /* migration: devices predates client linking */
+if (!deviceCols.includes("client_id")) {
+  db.exec("ALTER TABLE devices ADD COLUMN client_id TEXT");
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
