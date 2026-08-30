@@ -231,6 +231,12 @@
   .activity-row .a-value { font-size: 12.5px; font-weight: 620; font-family: "IBM Plex Mono", monospace; text-align: right; }
   .activity-row .a-time { font-size: 11px; color: var(--ink-faint); text-align: right; white-space: nowrap; margin-left: 10px; min-width: 72px; }
 
+  /* ---- docs page ---- */
+  .docs-steps { margin: 0; padding-left: 20px; color: var(--ink-dim); line-height: 1.8; }
+  .docs-steps li { margin-bottom: 12px; }
+  .docs-steps li:last-child { margin-bottom: 0; }
+  .docs-pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 8px 0 0; }
+
   /* ---- invoice sheet (print-style facture, cf. server/docs/facture_template*.html) ---- */
   .invoice-sheet-wrap { display: flex; justify-content: center; }
   .invoice-sheet {
@@ -300,12 +306,12 @@
     <div style="padding:0 10px 14px"><span class="brand sub" style="padding:0">Conso Claude Code</span></div>
     <button class="navitem active" data-view="dashboard"><span class="ic" style="color:var(--accent)">◧</span>Tableau de bord</button>
     <button class="navitem" data-view="clients"><span class="ic" style="color:var(--violet)">◔</span>Clients</button>
-    <button class="navitem" data-view="projects"><span class="ic" style="color:#c9622a">◇</span>Projets</button>
-    <button class="navitem" data-view="invoices"><span class="ic" style="color:#8a5cc9">▥</span>Factures</button>
+    <!-- <button class="navitem" data-view="projects"><span class="ic" style="color:#c9622a">◇</span>Projets</button> -->
     <button class="navitem" data-view="promotions"><span class="ic" style="color:#c9427a">%</span>Promotions</button>
-    <button class="navitem" data-view="import"><span class="ic" style="color:#4a7fb5">⇩</span>Synchro</button>
     <button class="navitem" data-view="devices"><span class="ic" style="color:#3f8f6e">▧</span>Appareils</button>
-    <button class="navitem" data-view="settings"><span class="ic" style="color:var(--bad)">⚙</span>Tarifs</button>
+    <button class="navitem" data-view="invoices"><span class="ic" style="color:#8a5cc9">▥</span>Factures</button>
+    <button class="navitem" data-view="import"><span class="ic" style="color:#4a7fb5">▤</span>Docs</button>
+    <!-- <button class="navitem" data-view="settings"><span class="ic" style="color:var(--bad)">⚙</span>Tarifs</button> -->
     <div class="sidebar-extra">
       <div class="sys-card" id="sidebar-status">
         <span class="sys-dot"></span>
@@ -349,6 +355,8 @@ const state = {
   deviceRefreshAttempts: 0,
   detailSearch: "",
   detailPage: 0,
+  docsOS: "windows",
+  docsPythonMode: "no-python",
 };
 const DETAIL_PAGE_SIZE = 12;
 
@@ -634,7 +642,7 @@ function updateSidebarStatus() {
     <span class="sys-dot ${dotCls}"></span>
     <div>
       <div class="sys-title">${title}</div>
-      <div class="sys-sub">${agent.seen ? syncLine : "Vérifie l'agent (onglet Synchro)"}</div>
+      <div class="sys-sub">${agent.seen ? syncLine : "Vérifie l'agent (onglet Docs)"}</div>
     </div>`;
 }
 
@@ -1808,6 +1816,88 @@ function deviceModal(device) {
   };
 }
 
+/* ---- contenu des instructions d'installation, par OS x avec/sans Python ---- */
+const DOCS_REPO_RAW = "https://raw.githubusercontent.com/FabrichJean/c-sha/main";
+function docsInstallSteps(os, pythonMode) {
+  const noPython = pythonMode === "no-python";
+  if (os === "windows") {
+    if (noPython) {
+      return `
+        <ol class="docs-steps">
+          <li>Ouvre <strong>PowerShell</strong> (touche Windows → tape <code class="k">powershell</code> → Entrée).</li>
+          <li>Colle ces lignes en remplaçant l'URL et la clé (voir encadré ci-dessous pour les trouver), puis Entrée :
+            <pre class="mono docs-pre">$env:LEDGER_URL = "https://ton-serveur.com"
+$env:LEDGER_SYNC_API_KEY = "colle-ta-cle-ici"
+irm ${DOCS_REPO_RAW}/install.ps1 | iex</pre>
+          </li>
+          <li>C'est tout. Le script télécharge <code class="k">ledger-agent-windows.exe</code> dans <code class="k">%USERPROFILE%\\.ledger\\bin\\</code>, l'enregistre et programme son démarrage automatique (tâche planifiée Windows).</li>
+        </ol>`;
+    }
+    return `
+      <ol class="docs-steps">
+        <li>Vérifie que Python est installé : ouvre PowerShell et tape <code class="k">python --version</code>. S'il n'est pas reconnu, utilise plutôt l'onglet "Sans Python" ci-dessus.</li>
+        <li>Récupère les fichiers du projet (dossier contenant <code class="k">configure_sync.py</code>) sur cette machine.</li>
+        <li>Dans PowerShell, place-toi dans ce dossier (<code class="k">cd chemin\\vers\\le\\dossier</code>) puis lance :
+          <pre class="mono docs-pre">python configure_sync.py
+python install_autosync.py</pre>
+        </li>
+        <li><code class="k">configure_sync.py</code> te demande l'URL du serveur et la clé API (voir encadré ci-dessous) ; <code class="k">install_autosync.py</code> programme le démarrage automatique.</li>
+      </ol>`;
+  }
+  if (os === "macos") {
+    if (noPython) {
+      return `
+        <ol class="docs-steps">
+          <li>Ouvre <strong>Terminal</strong> (Cmd+Espace → tape <code class="k">terminal</code> → Entrée).</li>
+          <li>Colle cette commande en remplaçant l'URL et la clé :
+            <pre class="mono docs-pre">LEDGER_URL="https://ton-serveur.com" LEDGER_SYNC_API_KEY="colle-ta-cle-ici" \\
+  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"</pre>
+          </li>
+          <li>Le script télécharge <code class="k">ledger-agent-macos</code> dans <code class="k">~/.ledger/bin/</code>, le configure et l'enregistre comme LaunchAgent (démarre tout seul, y compris après redémarrage).</li>
+        </ol>`;
+    }
+    return `
+      <ol class="docs-steps">
+        <li>Ouvre Terminal, vérifie Python avec <code class="k">python3 --version</code>.</li>
+        <li>Récupère les fichiers du projet (dossier contenant <code class="k">configure_sync.py</code>) sur cette machine, puis place-toi dedans (<code class="k">cd chemin/vers/le/dossier</code>).</li>
+        <li>Lance :
+          <pre class="mono docs-pre">python3 configure_sync.py
+python3 install_autosync.py</pre>
+        </li>
+        <li>Installe un LaunchAgent — les fichiers sont copiés dans <code class="k">~/Library/Application Support/Ledger/</code> (contrainte macOS : launchd ne peut pas accéder à <code class="k">~/Documents</code>).</li>
+      </ol>`;
+  }
+  // linux
+  if (noPython) {
+    return `
+      <ol class="docs-steps">
+        <li>Ouvre un terminal.</li>
+        <li>Colle cette commande en remplaçant l'URL et la clé :
+          <pre class="mono docs-pre">LEDGER_URL="https://ton-serveur.com" LEDGER_SYNC_API_KEY="colle-ta-cle-ici" \\
+  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"</pre>
+        </li>
+        <li>Le script télécharge <code class="k">ledger-agent-linux</code> dans <code class="k">~/.ledger/bin/</code> et l'enregistre comme service <code class="k">systemd --user</code> (redémarre tout seul en cas d'arrêt). Si <code class="k">systemd --user</code> n'est pas disponible (certains conteneurs/VPS minimalistes), repli automatique sur une entrée <code class="k">crontab</code>.</li>
+      </ol>`;
+  }
+  return `
+    <ol class="docs-steps">
+      <li>Ouvre un terminal, vérifie Python avec <code class="k">python3 --version</code>.</li>
+      <li>Récupère les fichiers du projet (dossier contenant <code class="k">configure_sync.py</code>) sur cette machine, puis place-toi dedans.</li>
+      <li>Lance :
+        <pre class="mono docs-pre">python3 configure_sync.py
+python3 install_autosync.py</pre>
+      </li>
+      <li>Installe un service <code class="k">systemd --user</code> (ou une entrée crontab en repli).</li>
+    </ol>`;
+}
+
+function docsUninstallCommand(os, pythonMode) {
+  if (pythonMode === "no-python") {
+    return os === "windows" ? "%USERPROFILE%\\.ledger\\bin\\ledger-agent.exe uninstall" : "~/.ledger/bin/ledger-agent uninstall";
+  }
+  return os === "windows" ? "python uninstall_autosync.py" : "python3 uninstall_autosync.py";
+}
+
 function renderImport() {
   const sync = state.lastSync;
   const agent = agentStatus();
@@ -1821,10 +1911,7 @@ function renderImport() {
           <div class="hint" style="color:var(--ink-dim)">${state.agentLastSeen ? `Dernier contact : ${new Date(state.agentLastSeen).toLocaleString("fr-FR")}` : "Aucun contact enregistré depuis le démarrage du serveur"}</div>
         </div>
       </div>
-      ${!agent.seen ? `<div class="card-body" style="padding-top:0;color:var(--ink-dim);font-size:12.5px">
-        Sur ta machine : <code class="k">python3 configure_sync.py</code> puis <code class="k">python3 install_autosync.py</code> (une seule fois chacun).
-        Logs : <code class="k">~/.ledger/logs/sync.log</code>
-      </div>` : ""}
+      ${!agent.seen ? `<div class="card-body" style="padding-top:0;color:var(--ink-dim);font-size:12.5px">Pas encore installé sur cette machine ? Suis les instructions ci-dessous.</div>` : ""}
     </div>`;
   const statusCard = sync ? `
     <div class="card">
@@ -1839,8 +1926,15 @@ function renderImport() {
     </div>` : `
     <div class="card"><div class="empty"><div class="big">⇩</div>Aucune synchro reçue pour l'instant.</div></div>`;
 
+  const osLabels = { windows: "Windows", macos: "macOS", linux: "Linux" };
+  const osTabs = `<div class="tabs">${Object.keys(osLabels).map(k => `<button data-docs-os="${k}" class="${state.docsOS === k ? "active" : ""}">${osLabels[k]}</button>`).join("")}</div>`;
+  const modeTabs = `<div class="tabs">
+    <button data-docs-mode="no-python" class="${state.docsPythonMode === "no-python" ? "active" : ""}">Sans Python (recommandé)</button>
+    <button data-docs-mode="python" class="${state.docsPythonMode === "python" ? "active" : ""}">Avec Python installé</button>
+  </div>`;
+
   return `
-    <div class="pagehead"><div><h1>Synchro</h1><div class="desc">Le serveur reçoit automatiquement les tokens depuis ta machine locale</div></div></div>
+    <div class="pagehead"><div><h1>Docs</h1><div class="desc">Installation de l'agent local, synchro automatique et utilisation du CRM</div></div></div>
 
     ${agentCard}
     ${statusCard}
@@ -1848,11 +1942,41 @@ function renderImport() {
     <div class="card">
       <div class="card-head"><h3>Comment ça marche</h3></div>
       <div class="card-body">
-        <p style="margin:0 0 10px;color:var(--ink-dim)">Sur ta machine, un processus persistant (<code class="k">ledger_agent.py daemon</code>, supervisé par launchd/systemd/Planificateur de tâches) reste connecté au serveur en long-polling. Il lit tes logs Claude Code locaux et pousse le résultat ici en moins d'une seconde après un clic sur "Rafraîchir", ou automatiquement toutes les 4h :</p>
-        <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">python3 configure_sync.py
-python3 install_autosync.py</pre>
-        <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Fonctionne à l'identique sur Windows, macOS et Linux (Python standard, aucune dépendance). Rien à faire de ton côté une fois installé — cette page se met à jour toute seule.</p>
-        <p style="margin:8px 0 0;color:var(--ink-dim);font-size:12.5px">Pas de Python installé ? macOS/Linux : <code class="k">LEDGER_URL=... LEDGER_SYNC_API_KEY=... bash -c "$(curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.sh)"</code> (les variables évitent les prompts, indispensable via curl|bash). Windows : définis <code class="k">$env:LEDGER_URL</code>/<code class="k">$env:LEDGER_SYNC_API_KEY</code> puis <code class="k">irm https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.ps1 | iex</code>.</p>
+        <p style="margin:0;color:var(--ink-dim)">Sur ta machine, un petit programme (l'« agent local ») reste connecté en permanence à ce serveur. Il lit tes logs Claude Code locaux, calcule la consommation de tokens, et l'envoie ici — automatiquement toutes les 4h, ou en moins d'une seconde quand tu cliques sur "Rafraîchir" dans le CRM. Aucune action manuelle une fois installé : cette page se met à jour toute seule.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Trouver l'URL et la clé API</h3><span class="hint">nécessaire pour l'installation, quelle que soit la machine</span></div>
+      <div class="card-body" style="color:var(--ink-dim)">
+        <ul style="margin:0;padding-left:18px;line-height:1.9">
+          <li><strong>URL du serveur</strong> : l'adresse à laquelle tu accèdes à ce CRM (ex. <code class="k">https://ledger.mondomaine.com</code>).</li>
+          <li><strong>Clé API de sync</strong> : affichée <strong>une seule fois</strong> dans le terminal, au tout premier démarrage du serveur. Si tu l'as perdue, elle reste lisible dans le fichier <code class="k">server/data/.env</code> sur le serveur (ligne <code class="k">SYNC_API_KEY=...</code>) — jamais affichée ici pour rester secrète.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Installer l'agent sur une machine</h3></div>
+      <div class="card-body">
+        ${osTabs}
+        <div style="margin-top:12px">${modeTabs}</div>
+        <div style="margin-top:16px">${docsInstallSteps(state.docsOS, state.docsPythonMode)}</div>
+        <div class="hint" style="color:var(--ink-faint);font-size:12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          Pour désinstaller : <code class="k">${docsUninstallCommand(state.docsOS, state.docsPythonMode)}</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Vérifier que ça marche</h3></div>
+      <div class="card-body" style="color:var(--ink-dim)">
+        <p style="margin:0 0 10px">Reviens sur cette page quelques secondes après l'installation : la carte "Agent local" en haut doit passer à <strong>Actif</strong>. Si ce n'est pas le cas :</p>
+        <ul style="margin:0;padding-left:18px;line-height:1.9">
+          <li>Vérifie les logs sur la machine : <code class="k">~/.ledger/logs/sync.log</code> (<code class="k">%USERPROFILE%\\.ledger\\logs\\sync.log</code> sur Windows).</li>
+          <li>Vérifie que l'URL du serveur est bien accessible depuis cette machine (essaie de l'ouvrir dans un navigateur).</li>
+          <li>Vérifie que la clé API collée est bien complète, sans espace ni retour à la ligne en trop.</li>
+        </ul>
       </div>
     </div>
 
@@ -2006,7 +2130,7 @@ function refreshProgressBanner() {
   const agentLine = agent.seen
     ? `Agent local détecté (vu il y a ${Math.round(agent.secAgo)}s) — en attente de son prochain passage.`
     : elapsedSec > 90
-      ? `Aucun signe de l'agent local depuis le début de l'attente. Vérifie qu'il tourne (voir l'onglet Synchro).`
+      ? `Aucun signe de l'agent local depuis le début de l'attente. Vérifie qu'il tourne (voir l'onglet Docs).`
       : `En attente d'un premier contact de l'agent local…`;
   return `
     <div class="card" style="border-color:var(--accent)">
@@ -2064,7 +2188,7 @@ async function handleRefreshClick() {
   render();
   toast(agentStatus().seen
     ? "L'agent répond mais n'a pas encore terminé — réessaie dans une minute"
-    : "Aucun agent local détecté — vérifie l'installation dans l'onglet Synchro");
+    : "Aucun agent local détecté — vérifie l'installation dans l'onglet Docs");
 }
 
 /* ---------------- on-demand refresh scope a un seul appareil ---------------- */
@@ -2168,6 +2292,12 @@ function wireView() {
 
   document.querySelectorAll("[data-trend-metric]").forEach(el => {
     el.onclick = () => { state.trendMetric = el.dataset.trendMetric; render(); };
+  });
+  document.querySelectorAll("[data-docs-os]").forEach(el => {
+    el.onclick = () => { state.docsOS = el.dataset.docsOs; render(); };
+  });
+  document.querySelectorAll("[data-docs-mode]").forEach(el => {
+    el.onclick = () => { state.docsPythonMode = el.dataset.docsMode; render(); };
   });
   const periodSelect = document.getElementById("trend-period");
   if (periodSelect) periodSelect.onchange = () => { state.trendPeriod = parseInt(periodSelect.value, 10); render(); };
