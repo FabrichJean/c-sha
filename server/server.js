@@ -268,7 +268,9 @@ app.get("/api/state", (req, res) => {
   const clients = db.prepare("SELECT * FROM clients ORDER BY name").all();
   const projects = db.prepare("SELECT * FROM projects ORDER BY name").all().map(p => ({
     ...p,
+    clientId: p.client_id,
     projectKeys: JSON.parse(p.project_keys || "[]"),
+    billingMode: p.billing_mode || "tokens",
   }));
   const usage = db.prepare("SELECT * FROM usage_entries").all().map(u => ({
     id: u.id,
@@ -295,7 +297,13 @@ app.get("/api/state", (req, res) => {
     devices.push({ id: "legacy", name: "Historique (avant suivi par appareil)", hostname: null, firstSeen: null, lastSeen: null });
   }
 
-  res.json({ clients, projects, usage, pricing, lastSync, agentLastSeen, syncRequested, devices });
+  const invoices = db.prepare("SELECT * FROM invoices ORDER BY created_at DESC").all().map(i => ({
+    id: i.id, clientId: i.client_id, periodStart: i.period_start, periodEnd: i.period_end,
+    status: i.status, total: i.total, lineItems: JSON.parse(i.line_items || "[]"),
+    notes: i.notes, createdAt: i.created_at, updatedAt: i.updated_at,
+  }));
+
+  res.json({ clients, projects, usage, pricing, lastSync, agentLastSeen, syncRequested, devices, invoices });
 });
 
 app.put("/api/devices/:id", (req, res) => {
@@ -365,23 +373,24 @@ app.delete("/api/clients/:id", (req, res) => {
 });
 
 app.post("/api/projects", (req, res) => {
-  const { name, clientId, projectKeys, rate } = req.body;
+  const { name, clientId, projectKeys, rate, billingMode } = req.body;
   if (!name) return res.status(400).json({ error: "Le nom est requis." });
   const now = new Date().toISOString();
   const row = {
     id: uid(), name, client_id: clientId || null,
     project_keys: JSON.stringify(projectKeys || []),
-    rate: rate || null, created_at: now, updated_at: now,
+    rate: rate || null, billing_mode: billingMode === "hourly" ? "hourly" : "tokens",
+    created_at: now, updated_at: now,
   };
-  db.prepare(`INSERT INTO projects (id, name, client_id, project_keys, rate, created_at, updated_at) VALUES (@id, @name, @client_id, @project_keys, @rate, @created_at, @updated_at)`).run(row);
-  res.json({ ...row, projectKeys: projectKeys || [] });
+  db.prepare(`INSERT INTO projects (id, name, client_id, project_keys, rate, billing_mode, created_at, updated_at) VALUES (@id, @name, @client_id, @project_keys, @rate, @billing_mode, @created_at, @updated_at)`).run(row);
+  res.json({ ...row, clientId: row.client_id, projectKeys: projectKeys || [], billingMode: row.billing_mode });
 });
 
 app.put("/api/projects/:id", (req, res) => {
-  const { name, clientId, projectKeys, rate } = req.body;
+  const { name, clientId, projectKeys, rate, billingMode } = req.body;
   const now = new Date().toISOString();
-  const info = db.prepare(`UPDATE projects SET name=@name, client_id=@client_id, project_keys=@project_keys, rate=@rate, updated_at=@updated_at WHERE id=@id`)
-    .run({ id: req.params.id, name, client_id: clientId || null, project_keys: JSON.stringify(projectKeys || []), rate: rate || null, updated_at: now });
+  const info = db.prepare(`UPDATE projects SET name=@name, client_id=@client_id, project_keys=@project_keys, rate=@rate, billing_mode=@billing_mode, updated_at=@updated_at WHERE id=@id`)
+    .run({ id: req.params.id, name, client_id: clientId || null, project_keys: JSON.stringify(projectKeys || []), rate: rate || null, billing_mode: billingMode === "hourly" ? "hourly" : "tokens", updated_at: now });
   if (info.changes === 0) return res.status(404).json({ error: "Projet introuvable." });
   res.json({ ok: true });
 });
@@ -391,6 +400,16 @@ app.delete("/api/projects/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+/* ---------------- factures (facturation virtuelle factice) ---------------- */
+app.post("/api/invoices", (req, res) => {
+  const { clientId, periodStart, periodEnd, lineItems, total, notes } = req.body;
+  if (!clientId || !periodStart || !periodEnd) return res.status(400).json({ error: "Client et periode requis." });
+  const now = new Date().toISOString();
+  const row = {
+    id: uid(), client_id: clientId, period_start: periodStart, period_end: periodEnd,
+    status: "draft", total: total || 0, line_items: JSON.stringify(lineItems || []),
+    notes: notes || null, created_at: now, updated_at: now,
+  };
 app.put("/api/pricing", (req, res) => {
   const value = JSON.stringify(req.body);
   db.prepare(`INSERT INTO settings (key, value) VALUES ('pricing', @value) ON CONFLICT(key) DO UPDATE SET value = @value`).run({ value });
