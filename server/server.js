@@ -110,41 +110,6 @@ function getPricing() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'pricing'").get();
   return row ? JSON.parse(row.value) : DEFAULT_PRICING_SERVER;
 }
-function costOfServer(model, totals, pricing) {
-  const p = pricing.models[model] || pricing.fallback || DEFAULT_PRICING_SERVER.fallback;
-  const t = totals || {};
-  return (t.input || 0) * p.in / 1e6 + (t.output || 0) * p.out / 1e6 +
-         (t.cacheCreate || 0) * p.cacheWrite / 1e6 + (t.cacheRead || 0) * p.cacheRead / 1e6;
-}
-
-/* ---------------- KPI compacts pour la vue appareil restreinte (lien de partage) ---------------- */
-function computeDeviceKpis(deviceId) {
-  const pricing = getPricing();
-  const rows = db.prepare("SELECT model, daily FROM usage_entries WHERE device_id = ?").all(deviceId);
-  const daily = []; // {date, model, input, output, cacheCreate, cacheRead}
-  for (const r of rows) {
-    const d = JSON.parse(r.daily || "{}");
-    for (const [date, t] of Object.entries(d)) daily.push({ date, model: r.model, ...t });
-  }
-  const totalTok = t => (t.input || 0) + (t.output || 0) + (t.cacheCreate || 0) + (t.cacheRead || 0);
-  const cacheTok = t => (t.cacheCreate || 0) + (t.cacheRead || 0);
-
-  const now = new Date();
-  const dateStr = offset => { const d = new Date(now); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
-  const today = dateStr(0), yesterday = dateStr(1);
-
-  const byDay = (days, reducer) => {
-    const out = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const ds = dateStr(i);
-      out.push(reducer(daily.filter(r => r.date === ds)));
-    }
-    return out;
-  };
-  const sumTokens = rs => rs.reduce((s, r) => s + totalTok(r), 0);
-  const sumCost = rs => rs.reduce((s, r) => s + costOfServer(r.model, r, pricing), 0);
-  const sumCache = rs => rs.reduce((s, r) => s + cacheTok(r), 0);
-  const countProjectsToday = () => new Set(daily.filter(r => r.date === today).map(r => r.projectKey)).size;
 
   const rowsToday = daily.filter(r => r.date === today);
   const rowsYesterday = daily.filter(r => r.date === yesterday);
