@@ -452,6 +452,30 @@ function toast(msg) {
   toast._t = setTimeout(() => t.classList.remove("show"), 2400);
 }
 
+/* navigator.clipboard exige un contexte securise (HTTPS ou localhost) — en
+   HTTP simple (deploiement sans reverse proxy TLS), l'API est absente ou
+   rejette silencieusement. On retente via un textarea + execCommand('copy')
+   (fonctionne en HTTP), puis en dernier recours une invite manuelle. */
+async function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* on retente en dessous */ }
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    if (ok) return true;
+  } catch (e) { /* on retente en dessous */ }
+  window.prompt("Copie manuellement (Ctrl/Cmd+C) :", text);
+  return false;
+}
+
 function fmtNum(n) { if (n === undefined || n === null || isNaN(n)) return "–"; return Math.round(n).toLocaleString("fr-FR"); }
 function fmtCompact(n) {
   if (n === undefined || n === null || isNaN(n)) return "–";
@@ -2401,24 +2425,24 @@ function wireView() {
   document.querySelectorAll("[data-docs-copy]").forEach(btn => {
     btn.onclick = async () => {
       const pre = btn.previousElementSibling;
-      try {
-        await navigator.clipboard.writeText(pre.textContent);
+      const ok = await copyToClipboard(pre.textContent);
+      if (ok) {
         const label = btn.querySelector("span");
         const original = label.textContent;
         label.textContent = "Copié !";
         setTimeout(() => { label.textContent = original; }, 1500);
-      } catch (e) { toast("Impossible de copier"); }
+      }
     };
   });
   document.querySelectorAll("[data-docs-copy-value]").forEach(btn => {
     btn.onclick = async () => {
-      try {
-        await navigator.clipboard.writeText(btn.dataset.docsCopyValue);
+      const ok = await copyToClipboard(btn.dataset.docsCopyValue);
+      if (ok) {
         const label = btn.querySelector("span");
         const original = label.textContent;
         label.textContent = "Copié !";
         setTimeout(() => { label.textContent = original; }, 1500);
-      } catch (e) { toast("Impossible de copier"); }
+      }
     };
   });
   const printDocsBtn = document.getElementById("btn-print-docs");
@@ -2571,12 +2595,8 @@ function wireView() {
       const device = state.devices.find(d => d.id === el.dataset.shareDevice);
       if (!device || !device.viewToken) { toast("Lien indisponible"); return; }
       const url = `${location.origin}/device.html?id=${encodeURIComponent(device.id)}&token=${encodeURIComponent(device.viewToken)}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        toast("Lien copié dans le presse-papiers");
-      } catch (err) {
-        window.prompt("Copie ce lien :", url);
-      }
+      const ok = await copyToClipboard(url);
+      if (ok) toast("Lien copié dans le presse-papiers");
     };
   });
 
