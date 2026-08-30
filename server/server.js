@@ -407,7 +407,7 @@ app.post("/api/invoices", (req, res) => {
   if (!Array.isArray(lineItems) || lineItems.length === 0) return res.status(400).json({ error: "Au moins une ligne est requise." });
   const now = new Date().toISOString();
   const row = {
-    id: uid(), client_id: clientId, period_start: periodStart, period_end: periodEnd,
+    id: uid(), client_id: clientId, period_start: periodStart || "", period_end: periodEnd || "",
     status: "draft", total: total || 0, line_items: JSON.stringify(lineItems || []),
     notes: notes || null, created_at: now, updated_at: now,
   };
