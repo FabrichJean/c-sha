@@ -1170,10 +1170,23 @@ function invoiceModal() {
         if (!line) return;
         line.deviceId = select.value || null;
         if (line.deviceId) {
+          const cap = computeTokenCostForDevice(line.deviceId, start, end).cost;
+          if (line.amount > cap) line.amount = cap;
+        }
+        renderCustomSection();
+        updateTotal();
+      };
+    });
     customEl.querySelectorAll("[data-custom-amount]").forEach(input => {
       input.oninput = () => {
         const line = customLines.find(l => l.id === input.dataset.customAmount);
-        if (line) line.amount = parseFloat(input.value) || 0;
+        if (!line) return;
+        let amount = parseFloat(input.value) || 0;
+        if (line.deviceId) {
+          const cap = computeTokenCostForDevice(line.deviceId, start, end).cost;
+          if (amount > cap) { amount = cap; input.value = cap.toFixed(2); }
+        }
+        line.amount = amount;
         updateTotal();
       };
     });
@@ -1182,7 +1195,7 @@ function invoiceModal() {
     });
     const addBtn = document.getElementById("btn-add-custom-line");
     if (addBtn) addBtn.onclick = () => {
-      customLines.push({ id: "c" + Date.now() + Math.random().toString(36).slice(2, 6), label: "", amount: 0 });
+      customLines.push({ id: "c" + Date.now() + Math.random().toString(36).slice(2, 6), label: "", amount: 0, deviceId: null });
       renderCustomSection();
       updateTotal();
     };
@@ -1258,6 +1271,7 @@ function invoiceModal() {
   function onMonthChange() {
     renderProjectLines();
     renderDeviceSection();
+    renderCustomSection();
     updateTotal();
   }
 
@@ -1282,9 +1296,14 @@ function invoiceModal() {
       const { tokens, cost } = computeTokenCostForDevice(id, start, end);
       return { deviceId: id, projectName: device ? device.name : id, billingMode: "device", tokens, amount: cost };
     });
-    const manualLines = customLines.filter(l => l.amount || l.label).map(l => ({
-      projectName: l.label.trim() || "Montant personnalisé", billingMode: "custom", amount: l.amount || 0,
-    }));
+    const manualLines = customLines.filter(l => l.amount || l.label).map(l => {
+      const cap = l.deviceId ? computeTokenCostForDevice(l.deviceId, start, end).cost : null;
+      const deviceName = l.deviceId ? (state.devices.find(d => d.id === l.deviceId) || {}).name : null;
+      return {
+        projectName: l.label.trim() || "Montant personnalisé", billingMode: "custom", amount: l.amount || 0,
+        deviceId: l.deviceId || null, deviceName, deviceCap: cap,
+      };
+    });
     const lineItems = [...projectLines, ...deviceLines, ...manualLines];
     if (!clientId || lineItems.length === 0) { toast("Ajoute au moins un projet, un appareil ou un montant"); return; }
     const total = lineItems.reduce((s, l) => s + l.amount, 0);
@@ -1336,7 +1355,7 @@ function renderInvoiceDetail() {
             ${inv.lineItems.map(l => `<tr>
               <td>${escapeHtml(l.projectName)}</td>
               <td class="hint">${l.billingMode === "hourly" ? "Taux horaire" : l.billingMode === "device" ? "Appareil" : l.billingMode === "custom" ? "Montant libre" : "Coût tokens"}</td>
-              <td class="num mono">${l.billingMode === "hourly" ? `${l.hours} h × $${l.rate}` : l.billingMode === "custom" ? "—" : `${fmtCompact(l.tokens)} tok`}</td>
+              <td class="num mono">${l.billingMode === "hourly" ? `${l.hours} h × $${l.rate}` : l.billingMode === "custom" ? (l.deviceId ? `sur ${fmtUsd(l.deviceCap)} (${escapeHtml(l.deviceName || "appareil")})` : "—") : `${fmtCompact(l.tokens)} tok`}</td>
               <td class="num mono">${fmtUsd(l.amount)}</td>
             </tr>`).join("")}
           </tbody>
