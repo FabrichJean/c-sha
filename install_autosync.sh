@@ -20,6 +20,14 @@ mkdir -p "$AGENT_DIR"
 cp "$DIR/export_usage.py" "$DIR/sync_usage.sh" "$AGENT_DIR/"
 chmod +x "$AGENT_DIR/sync_usage.sh"
 
+# Identite de cet appareil : generee une seule fois, reutilisee a chaque reinstall.
+DEVICE_FILE="$AGENT_DIR/device.conf"
+if [ ! -f "$DEVICE_FILE" ]; then
+  DEVICE_ID="dev-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:10])')"
+  DEVICE_NAME="$(scutil --get ComputerName 2>/dev/null || hostname -s 2>/dev/null || hostname)"
+  cat > "$DEVICE_FILE" <<EOF
+DEVICE_ID="$DEVICE_ID"
+DEVICE_NAME="$DEVICE_NAME"
 PLIST_LABEL="com.mdledger.tokensync"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 
