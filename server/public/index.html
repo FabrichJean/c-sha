@@ -805,28 +805,23 @@ function renderDashboard() {
     ${kpiHtml}
 
     <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:14px;align-items:start;margin-bottom:20px">
-      <div class="card-head"><h3>Tokens par jour · 30 derniers jours</h3><span class="hint">total (input + output + cache)</span></div>
-      <div class="card-body chart-wrap">${sparkBarChart(dates, series)}</div>
+      ${trendCard}
+      ${donutCard}
     </div>
 
-    <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:start">
-      <div class="card">
-        <div class="card-head"><h3>Par projet · 30 derniers jours</h3><span class="hint">tokens totaux</span></div>
-        <div class="card-body">${projectEntries.length ? hBarChart(projectEntries, maxProjectVal, colors) : emptyMini()}</div>
-      </div>
-      <div class="card">
-        <div class="card-head"><h3>Par modèle · cumulé</h3></div>
-        <div class="card-body">${donutChart(modelEntries, colors)}</div>
-      </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:14px;align-items:stretch;margin-bottom:24px">
+      ${agentCard}
+      ${syncCard}
+      ${activityCard}
     </div>
 
-    <div class="card">
+    <div class="card" id="detail-table">
       <div class="card-head"><h3>Détail par projet</h3><span class="hint">30 derniers jours, coût estimé</span></div>
       <div class="card-body" style="padding:0">
         <table>
           <thead><tr><th>Projet</th><th>Client</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th><th class="num">Coût est.</th></tr></thead>
           <tbody>
-            ${[...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1])).map(([pkey, t]) => {
+            ${projectEntries.map(([pkey, t]) => {
               const proj = projectForKey(pkey);
               const client = clientForProject(proj);
               const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
@@ -849,68 +844,6 @@ function renderDashboard() {
 
 function emptyMini() { return `<div class="hint" style="padding:20px 0;text-align:center">Pas de données sur cette période.</div>`; }
 
-function sparkBarChart(dates, values) {
-  const w = 900, h = 160, padL = 40, padB = 22, padT = 10;
-  const max = Math.max(1, ...values);
-  const barW = (w - padL - 10) / dates.length;
-  const bars = values.map((v, i) => {
-    const bh = (h - padT - padB) * (v / max);
-    const x = padL + i * barW, y = h - padB - bh;
-    const isLast = i === values.length - 1;
-    return `<rect x="${x + 1.5}" y="${y}" width="${Math.max(1, barW - 3)}" height="${bh}" rx="2" fill="${isLast ? "var(--accent)" : "var(--accent-soft)"}"></rect>`;
-  }).join("");
-  const gridY = [0, 0.5, 1].map(f => {
-    const y = padT + (h - padT - padB) * (1 - f);
-    return `<line x1="${padL}" x2="${w - 5}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="1"></line>
-            <text x="${padL - 8}" y="${y + 3}" font-size="10" text-anchor="end">${fmtCompact(max * f)}</text>`;
-  }).join("");
-  const labelEvery = Math.ceil(dates.length / 8);
-  const labels = dates.map((d, i) => i % labelEvery !== 0 ? "" : `<text x="${padL + i * barW + barW / 2}" y="${h - 5}" font-size="10" text-anchor="middle">${d.slice(5)}</text>`).join("");
-  return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px;display:block" role="img" aria-label="Tokens par jour">${gridY}${bars}${labels}</svg>`;
-}
-
-function hBarChart(entries, max, colors) {
-  return `<div style="display:flex;flex-direction:column;gap:10px">
-    ${entries.map(([pkey, t], i) => {
-      const proj = projectForKey(pkey);
-      const name = proj ? proj.name : pkey;
-      const val = totalTokens(t);
-      const pct = Math.max(2, (val / max) * 100);
-      return `<div>
-        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px">
-          <span>${escapeHtml(name)}</span><span class="mono" style="color:var(--ink-dim)">${fmtCompact(val)}</span>
-        </div>
-        <div style="height:8px;border-radius:5px;background:var(--surface-2);overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:${colors[i % colors.length]};border-radius:5px"></div>
-        </div>
-      </div>`;
-    }).join("")}
-  </div>`;
-}
-
-function donutChart(entries, colors) {
-  if (!entries.length) return emptyMini();
-  const total = entries.reduce((s, [, t]) => s + totalTokens(t), 0) || 1;
-  const r = 52, cx = 70, cy = 70, sw = 22;
-  let acc = 0;
-  const circumference = 2 * Math.PI * r;
-  const arcs = entries.slice(0, 6).map(([model, t], i) => {
-    const frac = totalTokens(t) / total;
-    const dash = frac * circumference;
-    const offset = circumference - acc * circumference;
-    acc += frac;
-    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="${sw}"
-      stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${offset}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
-  }).join("");
-  const legend = entries.slice(0, 6).map(([model, t], i) => {
-    const pct = ((totalTokens(t) / total) * 100).toFixed(1);
-    return `<div><span class="sw" style="background:${colors[i % colors.length]}"></span>${modelLabel(model)} — ${pct}%</div>`;
-  }).join("");
-  return `<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
-    <svg width="140" height="140" viewBox="0 0 140 140">${arcs}</svg>
-    <div class="legend" style="flex-direction:column;gap:8px;margin-top:0">${legend}</div>
-  </div>`;
-}
 
 function renderClients() {
   const rows = state.clients.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -1243,6 +1176,14 @@ function wireView() {
 
   const refreshBtn = document.getElementById("btn-refresh");
   if (refreshBtn) refreshBtn.onclick = handleRefreshClick;
+
+  document.querySelectorAll("[data-trend-metric]").forEach(el => {
+    el.onclick = () => { state.trendMetric = el.dataset.trendMetric; render(); };
+  });
+  const periodSelect = document.getElementById("trend-period");
+  if (periodSelect) periodSelect.onchange = () => { state.trendPeriod = parseInt(periodSelect.value, 10); render(); };
+  const scrollDetailBtn = document.getElementById("btn-scroll-detail");
+  if (scrollDetailBtn) scrollDetailBtn.onclick = () => document.getElementById("detail-table").scrollIntoView({ behavior: "smooth", block: "start" });
 
   const addClientBtn = document.getElementById("btn-add-client");
   if (addClientBtn) addClientBtn.onclick = () => clientModal(null);
