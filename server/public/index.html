@@ -240,6 +240,7 @@
     <button class="navitem active" data-view="dashboard"><span class="ic" style="color:var(--accent)">◧</span>Tableau de bord</button>
     <button class="navitem" data-view="clients"><span class="ic" style="color:var(--violet)">◔</span>Clients</button>
     <button class="navitem" data-view="projects"><span class="ic" style="color:#c9622a">◇</span>Projets</button>
+    <button class="navitem" data-view="invoices"><span class="ic" style="color:#8a5cc9">▥</span>Factures</button>
     <button class="navitem" data-view="import"><span class="ic" style="color:#4a7fb5">⇩</span>Synchro</button>
     <button class="navitem" data-view="devices"><span class="ic" style="color:#3f8f6e">▧</span>Appareils</button>
     <button class="navitem" data-view="settings"><span class="ic" style="color:var(--bad)">⚙</span>Tarifs</button>
@@ -268,6 +269,7 @@ const state = {
   projects: [],
   usage: [],
   devices: [],
+  invoices: [],
   pricing: null,
   lastSync: null,
   agentLastSeen: null,
@@ -278,6 +280,7 @@ const state = {
   trendMetric: "tokens",
   trendPeriod: 7,
   selectedDeviceId: null,
+  selectedInvoiceId: null,
   deviceRefreshing: false,
   deviceRefreshStartedAt: null,
   deviceRefreshAttempts: 0,
@@ -534,6 +537,7 @@ async function loadState() {
     state.projects = data.projects || [];
     state.usage = data.usage || [];
     state.devices = data.devices || [];
+    state.invoices = data.invoices || [];
     state.pricing = data.pricing || DEFAULT_PRICING;
     state.lastSync = data.lastSync || null;
     state.agentLastSeen = data.agentLastSeen || null;
@@ -596,12 +600,14 @@ function totalTokens(t) { return (t.input || 0) + (t.output || 0) + (t.cacheCrea
 /* ---------------- rendering ---------------- */
 function render() {
   const main = document.getElementById("main");
-  const activeNavView = state.view === "device-detail" ? "devices" : state.view;
+  const activeNavView = state.view === "device-detail" ? "devices" : state.view === "invoice-detail" ? "invoices" : state.view;
   document.querySelectorAll(".navitem").forEach(b => b.classList.toggle("active", b.dataset.view === activeNavView));
   if (!state.loaded) { main.innerHTML = `<div class="empty">Chargement…</div>`; return; }
   if (state.view === "dashboard") main.innerHTML = renderDashboard();
   else if (state.view === "clients") main.innerHTML = renderClients();
   else if (state.view === "projects") main.innerHTML = renderProjects();
+  else if (state.view === "invoices") main.innerHTML = renderInvoices();
+  else if (state.view === "invoice-detail") main.innerHTML = renderInvoiceDetail();
   else if (state.view === "import") main.innerHTML = renderImport();
   else if (state.view === "devices") main.innerHTML = renderDevices();
   else if (state.view === "device-detail") main.innerHTML = renderDeviceDetail();
@@ -975,7 +981,7 @@ function renderProjects() {
     <div class="card">
       ${rows.length === 0 ? `<div class="empty"><div class="big">◇</div>Aucun projet pour l'instant.</div>` : `
       <table>
-        <thead><tr><th>Projet</th><th>Client</th><th>Clés liées (dossiers)</th><th class="num">Taux $/h</th><th></th></tr></thead>
+        <thead><tr><th>Projet</th><th>Client</th><th>Clés liées (dossiers)</th><th>Facturation</th><th class="num">Taux $/h</th><th></th></tr></thead>
         <tbody>
           ${rows.map(p => {
             const client = state.clients.find(c => c.id === p.clientId);
@@ -983,6 +989,7 @@ function renderProjects() {
               <td><strong>${escapeHtml(p.name)}</strong></td>
               <td>${escapeHtml(client ? client.name : "—")}</td>
               <td>${(p.projectKeys || []).map(k => `<code class="k">${escapeHtml(k)}</code>`).join(" ") || "—"}</td>
+              <td>${p.billingMode === "hourly" ? "Taux horaire" : "Coût tokens"}</td>
               <td class="num mono">${p.rate ? p.rate : "—"}</td>
               <td style="text-align:right"><button class="btn ghost sm" data-del-project="${p.id}">Supprimer</button></td>
             </tr>`;
@@ -993,6 +1000,61 @@ function renderProjects() {
   `;
 }
 
+/* ---- factures (facturation virtuelle factice) ---- */
+const INVOICE_STATUS_LABELS = { draft: "Brouillon", sent: "Envoyée", paid: "Payée" };
+const INVOICE_STATUS_COLORS = { draft: "var(--ink-faint)", sent: "var(--warn)", paid: "var(--good)" };
+
+function monthBounds(monthStr) {
+  const [y, m] = monthStr.split("-").map(Number);
+  const start = new Date(Date.UTC(y, m - 1, 1));
+  const end = new Date(Date.UTC(y, m, 0));
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+}
+
+function computeTokenCostForProject(project, periodStart, periodEnd) {
+  const rows = allDailyRows().filter(r => (project.projectKeys || []).includes(r.projectKey) && r.date >= periodStart && r.date <= periodEnd);
+  return {
+    tokens: rows.reduce((s, r) => s + totalTokens(r), 0),
+    cost: rows.reduce((s, r) => s + costOf(r.model, r), 0),
+  };
+}
+
+function renderInvoices() {
+  const rows = state.invoices.slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  return `
+    <div class="pagehead">
+      <div><h1>Factures</h1><div class="desc">Facturation virtuelle — génère un aperçu de facture à partir de la conso ou d'un taux horaire</div></div>
+      <button class="btn primary" id="btn-add-invoice">+ Nouvelle facture</button>
+    </div>
+    <div class="card">
+      ${rows.length === 0 ? `<div class="empty"><div class="big">▥</div>Aucune facture pour l'instant.</div>` : `
+      <table>
+        <thead><tr><th>Client</th><th>Période</th><th class="num">Total</th><th>Statut</th><th>Créée</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map(inv => {
+            const client = state.clients.find(c => c.id === inv.clientId);
+            return `<tr class="clickable" data-view-invoice="${inv.id}">
+              <td><strong>${escapeHtml(client ? client.name : "Client supprimé")}</strong></td>
+              <td class="mono">${inv.periodStart} → ${inv.periodEnd}</td>
+              <td class="num mono">${fmtUsd(inv.total)}</td>
+              <td><span class="dot" style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${INVOICE_STATUS_COLORS[inv.status]};margin-right:6px"></span>${INVOICE_STATUS_LABELS[inv.status] || inv.status}</td>
+              <td class="hint" style="color:var(--ink-faint)">${new Date(inv.createdAt).toLocaleDateString("fr-FR")}</td>
+              <td style="text-align:right"><button class="btn ghost sm" data-del-invoice="${inv.id}">Supprimer</button></td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`}
+    </div>
+  `;
+}
+
+function invoiceModal() {
+  const clientOptions = state.clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
+  const defaultMonth = new Date().toISOString().slice(0, 7);
+  openModal(`
+    <div class="mh">Nouvelle facture</div>
+    <div class="mb">
+      <div class="row2">
 /* ---- devices ---- */
 function deviceStatus(device) {
   if (!device.lastSeen) return { seen: false, historic: true, label: "Historique" };
