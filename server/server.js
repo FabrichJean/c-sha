@@ -67,14 +67,31 @@ function requireApiKey(req, res, next) {
   return res.status(401).json({ error: "Cle API invalide ou manquante." });
 }
 
+/* ---------------- devices ---------------- */
+function upsertDevice(id, name, hostname) {
+  const now = new Date().toISOString();
+  const existing = db.prepare("SELECT id FROM devices WHERE id = ?").get(id);
+  if (existing) {
+    db.prepare(`UPDATE devices SET last_seen = @now, hostname = COALESCE(@hostname, hostname), name = COALESCE(name, @name) WHERE id = @id`)
+      .run({ id, now, hostname: hostname || null, name: name || id });
+  } else {
+    db.prepare(`INSERT INTO devices (id, name, hostname, first_seen, last_seen) VALUES (@id, @name, @hostname, @now, @now)`)
+      .run({ id, name: name || id, hostname: hostname || null, now });
+  }
+}
+
 /* ---------------- sync ingestion (shared by script push + manual browser import) ---------------- */
 function ingestUsagePayload(payload) {
   if (!payload || !Array.isArray(payload.projects)) {
     throw Object.assign(new Error("Format inattendu (cle 'projects' manquante)."), { status: 400 });
   }
+  const deviceId = payload.deviceId || "legacy";
+  const deviceName = payload.deviceName || (deviceId === "legacy" ? "Historique (avant suivi par appareil)" : deviceId);
+  if (deviceId !== "legacy") upsertDevice(deviceId, deviceName, payload.deviceName);
+
   const upsert = db.prepare(`
-    INSERT INTO usage_entries (id, project_key, yyyymm, model, totals, daily, imported_at)
-    VALUES (@id, @projectKey, @yyyymm, @model, @totals, @daily, @importedAt)
+    INSERT INTO usage_entries (id, project_key, yyyymm, model, totals, daily, imported_at, device_id)
+    VALUES (@id, @projectKey, @yyyymm, @model, @totals, @daily, @importedAt, @deviceId)
     ON CONFLICT(id) DO UPDATE SET totals = excluded.totals, daily = excluded.daily, imported_at = excluded.imported_at
   `);
   const now = new Date().toISOString();
@@ -83,7 +100,7 @@ function ingestUsagePayload(payload) {
     for (const proj of payload.projects) {
       for (const month of proj.months || []) {
         for (const m of month.models || []) {
-          const id = `${proj.projectKey}__${month.yyyymm}__${m.model}`;
+          const id = `${deviceId}__${proj.projectKey}__${month.yyyymm}__${m.model}`;
           upsert.run({
             id,
             projectKey: proj.projectKey,
@@ -92,6 +109,7 @@ function ingestUsagePayload(payload) {
             totals: JSON.stringify(m.totals || {}),
             daily: JSON.stringify(m.daily || {}),
             importedAt: now,
+            deviceId,
           });
           written++;
         }
@@ -100,7 +118,7 @@ function ingestUsagePayload(payload) {
   });
   tx();
   db.prepare(`INSERT INTO settings (key, value) VALUES ('last_sync', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
-    .run({ v: JSON.stringify({ at: now, written, messageCount: payload.messageCount || null }) });
+    .run({ v: JSON.stringify({ at: now, written, messageCount: payload.messageCount || null, deviceId }) });
   return { written, messageCount: payload.messageCount || null };
 }
 
@@ -116,11 +134,14 @@ app.post("/api/sync", requireApiKey, (req, res) => {
 });
 
 /* le script local interroge ceci pour savoir s'il doit pousser tout de suite
-   (au lieu d'attendre son prochain passage planifie) */
+   (au lieu d'attendre son prochain passage planifie) — sert aussi de battement
+   de coeur par appareil (mis a jour a chaque appel, meme sans synchro reelle) */
 app.get("/api/sync-status", requireApiKey, (req, res) => {
   const now = new Date().toISOString();
   db.prepare(`INSERT INTO settings (key, value) VALUES ('agent_last_seen', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
     .run({ v: JSON.stringify(now) });
+  const deviceId = req.query.deviceId;
+  if (deviceId) upsertDevice(deviceId, req.query.deviceName, req.query.deviceName);
   res.json({ requested: !!getSyncRequest(), requestedAt: getSyncRequest() });
 });
 
