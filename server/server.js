@@ -134,6 +134,29 @@ function computeDeviceKpis(deviceId) {
   const today = dateStr(0), yesterday = dateStr(1);
 
   const byDay = (days, reducer) => {
+    const out = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const ds = dateStr(i);
+      out.push(reducer(daily.filter(r => r.date === ds)));
+    }
+    return out;
+  };
+  const sumTokens = rs => rs.reduce((s, r) => s + totalTok(r), 0);
+  const sumCost = rs => rs.reduce((s, r) => s + costOfServer(r.model, r, pricing), 0);
+  const sumCache = rs => rs.reduce((s, r) => s + cacheTok(r), 0);
+  const countProjectsToday = () => new Set(daily.filter(r => r.date === today).map(r => r.projectKey)).size;
+
+  const rowsToday = daily.filter(r => r.date === today);
+  const rowsYesterday = daily.filter(r => r.date === yesterday);
+  const allTotal = { tokens: sumTokens(daily), cost: sumCost(daily), cache: sumCache(daily) };
+
+  return {
+    tokens: { today: sumTokens(rowsToday), yesterday: sumTokens(rowsYesterday), total: allTotal.tokens, sparkline: byDay(7, sumTokens) },
+    cost: { today: sumCost(rowsToday), yesterday: sumCost(rowsYesterday), total: allTotal.cost, sparkline: byDay(7, sumCost) },
+    cache: { today: sumCache(rowsToday), yesterday: sumCache(rowsYesterday), total: allTotal.cache, sparkline: byDay(7, sumCache) },
+  };
+}
+
 /* ---------------- sync ingestion (shared by script push + manual browser import) ---------------- */
 function ingestUsagePayload(payload) {
   if (!payload || !Array.isArray(payload.projects)) {
@@ -232,6 +255,38 @@ function clearDeviceSyncRequest(deviceId) {
     .run({ v: JSON.stringify(all) });
 }
 
+/* ---------------- vue restreinte "lien de partage" (aucun compte requis, juste le token) ---------------- */
+function requireDeviceToken(req, res, next) {
+  const device = db.prepare("SELECT id, view_token FROM devices WHERE id = ?").get(req.params.deviceId);
+  if (!device || !device.view_token || !timingSafeEqual(req.params.token, device.view_token)) {
+    return res.status(404).json({ error: "Lien invalide." });
+  }
+  next();
+}
+
+app.get("/api/device-view/:deviceId/:token", requireDeviceToken, (req, res) => {
+  const d = db.prepare("SELECT * FROM devices WHERE id = ?").get(req.params.deviceId);
+  const lastDataRow = db.prepare("SELECT MAX(imported_at) at FROM usage_entries WHERE device_id = ?").get(req.params.deviceId);
+  const secAgo = (Date.now() - new Date(d.last_seen).getTime()) / 1000;
+  res.json({
+    device: { id: d.id, name: d.name, hostname: d.hostname, firstSeen: d.first_seen, lastSeen: d.last_seen },
+    seen: secAgo < 150,
+    lastDataAt: lastDataRow ? lastDataRow.at : null,
+    kpis: computeDeviceKpis(req.params.deviceId),
+  });
+});
+
+app.post("/api/device-view/:deviceId/:token/request-sync", requireDeviceToken, (req, res) => {
+  setDeviceSyncRequest(req.params.deviceId);
+  res.json({ ok: true });
+});
+
+/* la page elle-meme doit rester accessible sans Basic Auth (le token dans l'URL
+   est la seule protection voulue pour ce lien de partage) */
+app.get("/device.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "device.html"));
+});
+
 /* ---------------- everything else behind basic auth ---------------- */
 app.use(requireBasicAuth);
 
@@ -260,6 +315,7 @@ app.get("/api/state", (req, res) => {
   const syncRequested = getSyncRequest();
   const devices = db.prepare("SELECT * FROM devices ORDER BY last_seen DESC").all().map(d => ({
     id: d.id, name: d.name, hostname: d.hostname, firstSeen: d.first_seen, lastSeen: d.last_seen,
+    viewToken: d.view_token || ensureViewToken(d.id),
   }));
   if (usage.some(u => u.deviceId === "legacy") && !devices.some(d => d.id === "legacy")) {
     devices.push({ id: "legacy", name: "Historique (avant suivi par appareil)", hostname: null, firstSeen: null, lastSeen: null });
