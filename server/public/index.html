@@ -1049,7 +1049,7 @@ function renderDevices() {
               <td class="num mono">${fmtCompact(d.tokens)}</td>
               <td class="num mono">${fmtUsd(d.cost)}</td>
               <td style="text-align:right;white-space:nowrap">
-                ${d.id !== "legacy" ? `<button class="btn ghost sm" data-share-device="${d.id}">⇗ Partager</button> <button class="btn ghost sm" data-rename-device="${d.id}">Renommer</button> <button class="btn ghost sm" data-del-device="${d.id}">Supprimer</button>` : ""}
+                ${d.id !== "legacy" ? `<button class="btn ghost sm" data-share-device="${d.id}">↗ Partager</button> <button class="btn ghost sm" data-rename-device="${d.id}">Renommer</button> <button class="btn ghost sm" data-del-device="${d.id}">Supprimer</button>` : ""}
               </td>
             </tr>`;
           }).join("")}
