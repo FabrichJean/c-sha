@@ -169,6 +169,15 @@ function setDeviceSyncRequest(deviceId) {
   all[deviceId] = new Date().toISOString();
   db.prepare(`INSERT INTO settings (key, value) VALUES ('device_sync_requested', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
     .run({ v: JSON.stringify(all) });
+}
+function clearDeviceSyncRequest(deviceId) {
+  const all = getAllDeviceSyncRequests();
+  if (!(deviceId in all)) return;
+  delete all[deviceId];
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('device_sync_requested', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
+    .run({ v: JSON.stringify(all) });
+}
+
 /* ---------------- everything else behind basic auth ---------------- */
 app.use(requireBasicAuth);
 
@@ -210,6 +219,14 @@ app.put("/api/devices/:id", (req, res) => {
   if (!name) return res.status(400).json({ error: "Le nom est requis." });
   const info = db.prepare("UPDATE devices SET name = ? WHERE id = ?").run(name, req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Appareil introuvable." });
+  res.json({ ok: true });
+});
+
+/* le bouton "Rafraichir" d'une page appareil demande une synchro a ce seul appareil */
+app.post("/api/devices/:id/request-sync", (req, res) => {
+  const device = db.prepare("SELECT id FROM devices WHERE id = ?").get(req.params.id);
+  if (!device) return res.status(404).json({ error: "Appareil introuvable." });
+  setDeviceSyncRequest(req.params.id);
   res.json({ ok: true });
 });
 
