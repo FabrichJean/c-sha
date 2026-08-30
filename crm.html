@@ -1,0 +1,1029 @@
+<!doctype html>
+<title>Ledger</title>
+<style>
+  :root {
+    --bg: #eef1ef;
+    --surface: #ffffff;
+    --surface-2: #e2e7e4;
+    --border: #cad3ce;
+    --ink: #142420;
+    --ink-dim: #52645d;
+    --ink-faint: #85958e;
+    --accent: #21705c;
+    --accent-ink: #ffffff;
+    --accent-soft: #dcece6;
+    --violet: #6a5aa8;
+    --violet-soft: #e6e2f2;
+    --good: #2f8f5b;
+    --warn: #b9791f;
+    --bad: #bd4636;
+    --bad-soft: #f7e2de;
+    --shadow: 0 1px 2px rgba(20,36,32,.06), 0 8px 24px -12px rgba(20,36,32,.18);
+    color-scheme: light;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: #121815;
+      --surface: #1a2320;
+      --surface-2: #212c28;
+      --border: #2e3b36;
+      --ink: #eaf2ee;
+      --ink-dim: #a9bab3;
+      --ink-faint: #728880;
+      --accent: #4bbf9c;
+      --accent-ink: #0b1a15;
+      --accent-soft: #1c332c;
+      --violet: #a598d6;
+      --violet-soft: #29253d;
+      --good: #4bbf7e;
+      --warn: #dba53f;
+      --bad: #e07362;
+      --bad-soft: #3a2420;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121815;
+    --surface: #1a2320;
+    --surface-2: #212c28;
+    --border: #2e3b36;
+    --ink: #eaf2ee;
+    --ink-dim: #a9bab3;
+    --ink-faint: #728880;
+    --accent: #4bbf9c;
+    --accent-ink: #0b1a15;
+    --accent-soft: #1c332c;
+    --violet: #a598d6;
+    --violet-soft: #29253d;
+    --good: #4bbf7e;
+    --warn: #dba53f;
+    --bad: #e07362;
+    --bad-soft: #3a2420;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { font-family: "IBM Plex Sans", sans-serif; text-wrap: balance; margin: 0; }
+  a { color: inherit; }
+  button { font-family: inherit; }
+
+  #app { display: flex; min-height: 100vh; }
+
+  /* ---- sidebar ---- */
+  nav.sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 20px 14px;
+    gap: 4px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 10px 20px;
+  }
+  .brand .mark {
+    width: 10px; height: 10px; border-radius: 2px;
+    background: var(--accent);
+    display: inline-block;
+    transform: rotate(45deg);
+  }
+  .brand .name { font-weight: 600; font-size: 15px; letter-spacing: .01em; }
+  .brand .sub { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .08em; }
+
+  .navitem {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    color: var(--ink-dim);
+    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 500;
+    border: none;
+    background: none;
+    text-align: left;
+    width: 100%;
+  }
+  .navitem:hover { background: var(--surface-2); color: var(--ink); }
+  .navitem.active { background: var(--accent-soft); color: var(--accent); }
+  .navitem .ic { width: 16px; text-align: center; opacity: .85; }
+
+  .sidebar-foot {
+    margin-top: auto;
+    padding: 10px;
+    font-size: 11px;
+    color: var(--ink-faint);
+    border-top: 1px solid var(--border);
+  }
+
+  main { flex: 1; padding: 32px 40px 60px; max-width: 1180px; }
+
+  .pagehead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .pagehead h1 { font-size: 22px; font-weight: 650; }
+  .pagehead .desc { color: var(--ink-dim); font-size: 13px; margin-top: 4px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 550;
+    cursor: pointer;
+  }
+  .btn:hover { border-color: var(--ink-faint); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.ghost { border-color: transparent; background: none; }
+  .btn.ghost:hover { background: var(--surface-2); }
+  .btn.danger { color: var(--bad); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.sm { padding: 5px 10px; font-size: 12px; }
+
+  /* ---- KPI tiles ---- */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+  }
+  .tile .label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 600; }
+  .tile .value { font-size: 25px; font-weight: 650; margin-top: 6px; font-family: "IBM Plex Mono", monospace; }
+  .tile .sub { font-size: 12px; color: var(--ink-dim); margin-top: 3px; }
+  .tile .value.accent { color: var(--accent); }
+  .tile .value.violet { color: var(--violet); }
+
+  /* ---- cards / sections ---- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 22px;
+    overflow: hidden;
+  }
+  .card .card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card .card-head h3 { font-size: 14px; font-weight: 620; }
+  .card .card-head .hint { font-size: 12px; color: var(--ink-faint); }
+  .card .card-body { padding: 18px; }
+
+  .chart-wrap { overflow-x: auto; }
+  svg text { font-family: "IBM Plex Mono", monospace; fill: var(--ink-dim); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-family: "IBM Plex Mono", monospace; text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+  tr.clickable:hover { background: var(--surface-2); cursor: pointer; }
+
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+  .pill.model-opus { background: var(--violet-soft); color: var(--violet); }
+  .pill.model-sonnet { background: var(--accent-soft); color: var(--accent); }
+  .pill.model-haiku { background: var(--surface-2); color: var(--ink-dim); }
+  .pill.model-other { background: var(--surface-2); color: var(--ink-dim); }
+
+  .empty { text-align: center; padding: 50px 20px; color: var(--ink-faint); }
+  .empty .big { font-size: 30px; margin-bottom: 8px; }
+
+  /* forms */
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+  .field input, .field select, .field textarea {
+    padding: 8px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 13.5px;
+    font-family: inherit;
+  }
+  .field textarea { font-family: "IBM Plex Mono", monospace; font-size: 12px; min-height: 140px; resize: vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(10,16,14,.45);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 8vh 20px; z-index: 50;
+  }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    width: 100%; max-width: 480px; box-shadow: var(--shadow);
+  }
+  .modal .mh { padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 640; font-size: 15px; }
+  .modal .mb { padding: 20px; }
+  .modal .mf { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+  [hidden] { display: none !important; }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: var(--bg);
+    padding: 10px 18px; border-radius: 9px; font-size: 13px; box-shadow: var(--shadow);
+    z-index: 80; opacity: 0; transition: opacity .2s;
+  }
+  .toast.show { opacity: 1; }
+
+  .badge-count { background: var(--surface-2); color: var(--ink-dim); font-size: 11px; padding: 1px 7px; border-radius: 999px; margin-left: auto; }
+
+  .link-select { display: flex; align-items: center; gap: 8px; }
+
+  code.k { background: var(--surface-2); padding: 1px 6px; border-radius: 5px; font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--ink-dim); }
+  .legend .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;650;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<div id="app">
+  <nav class="sidebar">
+    <div class="brand"><span class="mark"></span><span class="name">Ledger</span></div>
+    <div style="padding:0 10px 14px"><span class="brand sub" style="padding:0">Conso Claude Code</span></div>
+    <button class="navitem active" data-view="dashboard"><span class="ic">◧</span>Tableau de bord</button>
+    <button class="navitem" data-view="clients"><span class="ic">◔</span>Clients</button>
+    <button class="navitem" data-view="projects"><span class="ic">◇</span>Projets</button>
+    <button class="navitem" data-view="import"><span class="ic">⇩</span>Importer conso</button>
+    <button class="navitem" data-view="settings"><span class="ic">⚙</span>Tarifs</button>
+    <div class="sidebar-foot" id="sidebar-status">Connexion…</div>
+  </nav>
+  <main id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ---------------- state ---------------- */
+const state = {
+  db: null,
+  view: "dashboard",
+  clients: [],       // {id, name, company, email, notes, createdAt}
+  projects: [],      // {id, name, clientId, projectKeys: [string], rate, createdAt}
+  usage: [],          // usage docs: {id, projectKey, yyyymm, model, totals, daily}
+  pricing: null,      // {models: {id: {in, out, cacheWrite, cacheRead}}, updatedAt}
+  ready: false,
+};
+
+const DEFAULT_PRICING = {
+  models: {
+    "claude-fable-5":   { in: 10, out: 50, cacheWrite: 12.5, cacheRead: 1 },
+    "claude-mythos-5":  { in: 10, out: 50, cacheWrite: 12.5, cacheRead: 1 },
+    "claude-opus-5":    { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-opus-4-8":  { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-opus-4-7":  { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-opus-4-6":  { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-sonnet-5":  { in: 2,  out: 10, cacheWrite: 2.5,  cacheRead: 0.2 },
+    "claude-sonnet-4-6":{ in: 3,  out: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+    "claude-haiku-4-5": { in: 1,  out: 5,  cacheWrite: 1.25, cacheRead: 0.1 },
+  },
+  fallback: { in: 3, out: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+  updatedAt: null,
+};
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 2400);
+}
+
+function fmtNum(n) {
+  if (n === undefined || n === null || isNaN(n)) return "–";
+  return Math.round(n).toLocaleString("fr-FR");
+}
+function fmtCompact(n) {
+  if (n === undefined || n === null || isNaN(n)) return "–";
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2).replace(".", ",") + "M";
+  if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1).replace(".", ",") + "k";
+  return Math.round(n).toString();
+}
+function fmtUsd(n) {
+  if (n === undefined || n === null || isNaN(n)) return "–";
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function modelClass(model) {
+  if (!model) return "model-other";
+  if (model.includes("opus") || model.includes("fable") || model.includes("mythos")) return "model-opus";
+  if (model.includes("sonnet")) return "model-sonnet";
+  if (model.includes("haiku")) return "model-haiku";
+  return "model-other";
+}
+function modelLabel(model) {
+  if (!model) return "?";
+  return model.replace("claude-", "");
+}
+
+function pricingFor(model) {
+  const p = state.pricing || DEFAULT_PRICING;
+  return p.models[model] || p.fallback || DEFAULT_PRICING.fallback;
+}
+function costOf(model, totals) {
+  const p = pricingFor(model);
+  const t = totals || {};
+  return (
+    (t.input || 0) * p.in / 1e6 +
+    (t.output || 0) * p.out / 1e6 +
+    (t.cacheCreate || 0) * p.cacheWrite / 1e6 +
+    (t.cacheRead || 0) * p.cacheRead / 1e6
+  );
+}
+
+/* ---------------- db wiring ---------------- */
+async function initDb() {
+  try {
+    const db = await claude.use("db");
+    if (!db) { document.getElementById("sidebar-status").textContent = "Stockage indisponible"; return; }
+    state.db = db;
+    document.getElementById("sidebar-status").textContent = "Synchronisé";
+
+    db.collection("clients").onSnapshot(snap => {
+      state.clients = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    });
+    db.collection("projects").onSnapshot(snap => {
+      state.projects = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    });
+    db.collection("usage").onSnapshot(snap => {
+      state.usage = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    });
+    db.doc("settings/pricing").onSnapshot(snap => {
+      state.pricing = snap.exists ? snap.data() : DEFAULT_PRICING;
+      render();
+    });
+  } catch (e) {
+    document.getElementById("sidebar-status").textContent = "Erreur de connexion";
+  }
+}
+
+/* ---------------- derived data helpers ---------------- */
+function projectForKey(key) {
+  return state.projects.find(p => (p.projectKeys || []).includes(key));
+}
+function clientForProject(project) {
+  return project ? state.clients.find(c => c.id === project.clientId) : null;
+}
+function displayNameForKey(key) {
+  const proj = projectForKey(key);
+  return proj ? proj.name : key;
+}
+
+function allDailyRows() {
+  // flatten usage docs into {date, projectKey, model, input, output, cacheCreate, cacheRead}
+  const rows = [];
+  for (const u of state.usage) {
+    const daily = u.daily || {};
+    for (const [date, t] of Object.entries(daily)) {
+      rows.push({ date, projectKey: u.projectKey, model: u.model, ...t });
+    }
+  }
+  return rows;
+}
+
+function aggregate(rows, keyFn) {
+  const map = new Map();
+  for (const r of rows) {
+    const k = keyFn(r);
+    if (!map.has(k)) map.set(k, { input: 0, output: 0, cacheCreate: 0, cacheRead: 0, count: 0 });
+    const b = map.get(k);
+    b.input += r.input || 0; b.output += r.output || 0;
+    b.cacheCreate += r.cacheCreate || 0; b.cacheRead += r.cacheRead || 0;
+    b.count++;
+  }
+  return map;
+}
+function totalTokens(t) { return (t.input || 0) + (t.output || 0) + (t.cacheCreate || 0) + (t.cacheRead || 0); }
+
+/* ---------------- rendering ---------------- */
+function render() {
+  const main = document.getElementById("main");
+  document.querySelectorAll(".navitem").forEach(b => b.classList.toggle("active", b.dataset.view === state.view));
+  if (state.view === "dashboard") main.innerHTML = renderDashboard();
+  else if (state.view === "clients") main.innerHTML = renderClients();
+  else if (state.view === "projects") main.innerHTML = renderProjects();
+  else if (state.view === "import") main.innerHTML = renderImport();
+  else if (state.view === "settings") main.innerHTML = renderSettings();
+  wireView();
+}
+
+/* ---- dashboard ---- */
+function clipboardBanner() {
+  if (!state.clipboardCandidate) return "";
+  const exportedAt = state.clipboardCandidate.parsed.exportedAt;
+  const when = exportedAt ? new Date(exportedAt).toLocaleString("fr-FR") : "?";
+  return `
+    <div class="card" style="border-color:var(--accent);background:var(--accent-soft)">
+      <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div><strong>Nouvelle synchro détectée</strong><div class="hint" style="color:var(--ink-dim)">Export généré le ${when}, prêt dans le presse-papiers.</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn ghost sm" id="btn-dismiss-clip">Ignorer</button>
+          <button class="btn primary sm" id="btn-apply-clip">Importer maintenant</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderDashboard() {
+  const rows = allDailyRows();
+  const banner = clipboardBanner();
+  if (rows.length === 0) {
+    return `
+      ${banner}
+      <div class="pagehead"><div><h1>Tableau de bord</h1><div class="desc">Vue d'ensemble de ta consommation de tokens Claude Code</div></div></div>
+      <div class="card"><div class="empty">
+        <div class="big">◧</div>
+        <div><strong>Aucune donnée pour l'instant.</strong></div>
+        <div style="margin-top:6px">Lance l'export local puis colle le résultat dans l'onglet Importer conso.</div>
+        <button class="btn primary" style="margin-top:16px" data-nav="import">Aller à l'import</button>
+      </div></div>`;
+  }
+
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+  const d7 = new Date(now); d7.setDate(d7.getDate() - 7);
+
+  const in30 = rows.filter(r => r.date >= d30.toISOString().slice(0, 10));
+  const in7 = rows.filter(r => r.date >= d7.toISOString().slice(0, 10));
+
+  const totalAll = rows.reduce((s, r) => s + totalTokens(r), 0);
+  const total30 = in30.reduce((s, r) => s + totalTokens(r), 0);
+  const total7 = in7.reduce((s, r) => s + totalTokens(r), 0);
+
+  const cost30 = in30.reduce((s, r) => s + costOf(r.model, r), 0);
+  const costAll = rows.reduce((s, r) => s + costOf(r.model, r), 0);
+
+  const activeProjects = new Set(rows.filter(r => r.date >= d30.toISOString().slice(0, 10)).map(r => r.projectKey)).size;
+
+  // daily series (last 30d)
+  const byDate = aggregate(in30, r => r.date);
+  const dates = [];
+  for (let i = 29; i >= 0; i--) {
+    const dt = new Date(now); dt.setDate(dt.getDate() - i);
+    dates.push(dt.toISOString().slice(0, 10));
+  }
+  const series = dates.map(d => totalTokens(byDate.get(d) || {}));
+
+  // by model (all time)
+  const byModel = aggregate(rows, r => r.model);
+  const modelEntries = [...byModel.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
+
+  // by project (30d)
+  const byProject = aggregate(in30, r => r.projectKey);
+  const projectEntries = [...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1])).slice(0, 8);
+  const maxProjectVal = Math.max(1, ...projectEntries.map(([, v]) => totalTokens(v)));
+
+  const colors = ["#21705c", "#6a5aa8", "#b9791f", "#bd4636", "#2f8f5b", "#4a7fb5", "#a8635c", "#7d8f52"];
+
+  return `
+    ${banner}
+    <div class="pagehead">
+      <div><h1>Tableau de bord</h1><div class="desc">Vue d'ensemble de ta consommation de tokens Claude Code</div></div>
+      <button class="btn ghost" data-nav="import">⇩ Importer une nouvelle synchro</button>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><div class="label">7 derniers jours</div><div class="value">${fmtCompact(total7)}</div><div class="sub">tokens</div></div>
+      <div class="tile"><div class="label">30 derniers jours</div><div class="value accent">${fmtCompact(total30)}</div><div class="sub">≈ ${fmtUsd(cost30)}</div></div>
+      <div class="tile"><div class="label">Total cumulé</div><div class="value">${fmtCompact(totalAll)}</div><div class="sub">≈ ${fmtUsd(costAll)} au total</div></div>
+      <div class="tile"><div class="label">Projets actifs (30j)</div><div class="value violet">${activeProjects}</div><div class="sub">sur ${state.projects.length || "–"} suivis</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Tokens par jour · 30 derniers jours</h3><span class="hint">total (input + output + cache)</span></div>
+      <div class="card-body chart-wrap">${sparkBarChart(dates, series)}</div>
+    </div>
+
+    <div class="row2" style="display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:start">
+      <div class="card">
+        <div class="card-head"><h3>Par projet · 30 derniers jours</h3><span class="hint">tokens totaux</span></div>
+        <div class="card-body">${projectEntries.length ? hBarChart(projectEntries, maxProjectVal, colors) : emptyMini()}</div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Par modèle · cumulé</h3></div>
+        <div class="card-body">${donutChart(modelEntries, colors)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Détail par projet</h3><span class="hint">30 derniers jours, coût estimé</span></div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Projet</th><th>Client</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th><th class="num">Coût est.</th></tr></thead>
+          <tbody>
+            ${[...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1])).map(([pkey, t]) => {
+              const proj = projectForKey(pkey);
+              const client = clientForProject(proj);
+              const rowsForProj = in30.filter(r => r.projectKey === pkey);
+              const cost = rowsForProj.reduce((s, r) => s + costOf(r.model, r), 0);
+              return `<tr>
+                <td>${escapeHtml(proj ? proj.name : pkey)}${!proj ? ` <span class="hint" style="color:var(--warn)">· non lié</span>` : ""}</td>
+                <td>${escapeHtml(client ? client.name : "—")}</td>
+                <td class="num mono">${fmtNum(t.input)}</td>
+                <td class="num mono">${fmtNum(t.output)}</td>
+                <td class="num mono">${fmtNum(t.cacheCreate + t.cacheRead)}</td>
+                <td class="num mono">${fmtNum(totalTokens(t))}</td>
+                <td class="num mono">${fmtUsd(cost)}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function emptyMini() { return `<div class="hint" style="padding:20px 0;text-align:center">Pas de données sur cette période.</div>`; }
+
+function sparkBarChart(dates, values) {
+  const w = 900, h = 160, padL = 40, padB = 22, padT = 10;
+  const max = Math.max(1, ...values);
+  const barW = (w - padL - 10) / dates.length;
+  const bars = values.map((v, i) => {
+    const bh = (h - padT - padB) * (v / max);
+    const x = padL + i * barW;
+    const y = h - padB - bh;
+    const isLast = i === values.length - 1;
+    return `<rect x="${x + 1.5}" y="${y}" width="${Math.max(1, barW - 3)}" height="${bh}" rx="2" fill="${isLast ? "var(--accent)" : "var(--accent-soft)"}"></rect>`;
+  }).join("");
+  const gridY = [0, 0.5, 1].map(f => {
+    const y = padT + (h - padT - padB) * (1 - f);
+    const val = fmtCompact(max * f);
+    return `<line x1="${padL}" x2="${w - 5}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="1"></line>
+            <text x="${padL - 8}" y="${y + 3}" font-size="10" text-anchor="end">${val}</text>`;
+  }).join("");
+  const labelEvery = Math.ceil(dates.length / 8);
+  const labels = dates.map((d, i) => {
+    if (i % labelEvery !== 0) return "";
+    const x = padL + i * barW + barW / 2;
+    return `<text x="${x}" y="${h - 5}" font-size="10" text-anchor="middle">${d.slice(5)}</text>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px;display:block" role="img" aria-label="Tokens par jour">${gridY}${bars}${labels}</svg>`;
+}
+
+function hBarChart(entries, max, colors) {
+  return `<div style="display:flex;flex-direction:column;gap:10px">
+    ${entries.map(([pkey, t], i) => {
+      const proj = projectForKey(pkey);
+      const name = proj ? proj.name : pkey;
+      const val = totalTokens(t);
+      const pct = Math.max(2, (val / max) * 100);
+      const color = colors[i % colors.length];
+      return `<div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px">
+          <span>${escapeHtml(name)}</span><span class="mono" style="color:var(--ink-dim)">${fmtCompact(val)}</span>
+        </div>
+        <div style="height:8px;border-radius:5px;background:var(--surface-2);overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${color};border-radius:5px"></div>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+function donutChart(entries, colors) {
+  if (!entries.length) return emptyMini();
+  const total = entries.reduce((s, [, t]) => s + totalTokens(t), 0) || 1;
+  const r = 52, cx = 70, cy = 70, sw = 22;
+  let acc = 0;
+  const circumference = 2 * Math.PI * r;
+  const arcs = entries.slice(0, 6).map(([model, t], i) => {
+    const frac = totalTokens(t) / total;
+    const dash = frac * circumference;
+    const offset = circumference - acc * circumference;
+    acc += frac;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="${sw}"
+      stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${offset}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+  }).join("");
+  const legend = entries.slice(0, 6).map(([model, t], i) => {
+    const pct = ((totalTokens(t) / total) * 100).toFixed(1);
+    return `<div><span class="sw" style="background:${colors[i % colors.length]}"></span>${modelLabel(model)} — ${pct}%</div>`;
+  }).join("");
+  return `<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+    <svg width="140" height="140" viewBox="0 0 140 140">${arcs}</svg>
+    <div class="legend" style="flex-direction:column;gap:8px;margin-top:0">${legend}</div>
+  </div>`;
+}
+
+/* ---- clients ---- */
+function renderClients() {
+  const rows = state.clients.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  return `
+    <div class="pagehead">
+      <div><h1>Clients</h1><div class="desc">Les organisations ou personnes pour qui tu factures du travail Claude Code</div></div>
+      <button class="btn primary" id="btn-add-client">+ Nouveau client</button>
+    </div>
+    <div class="card">
+      ${rows.length === 0 ? `<div class="empty"><div class="big">◔</div>Aucun client pour l'instant.</div>` : `
+      <table>
+        <thead><tr><th>Nom</th><th>Société</th><th>Email</th><th class="num">Projets</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map(c => {
+            const nProj = state.projects.filter(p => p.clientId === c.id).length;
+            return `<tr class="clickable" data-edit-client="${c.id}">
+              <td><strong>${escapeHtml(c.name)}</strong></td>
+              <td>${escapeHtml(c.company || "—")}</td>
+              <td>${escapeHtml(c.email || "—")}</td>
+              <td class="num mono">${nProj}</td>
+              <td style="text-align:right"><button class="btn ghost sm" data-del-client="${c.id}">Supprimer</button></td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`}
+    </div>
+  `;
+}
+
+/* ---- projects ---- */
+function renderProjects() {
+  const rows = state.projects.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const unmatchedKeys = [...new Set(state.usage.map(u => u.projectKey))].filter(k => !projectForKey(k));
+  return `
+    <div class="pagehead">
+      <div><h1>Projets</h1><div class="desc">Relie tes dossiers de travail locaux à un client pour ventiler la conso</div></div>
+      <button class="btn primary" id="btn-add-project">+ Nouveau projet</button>
+    </div>
+
+    ${unmatchedKeys.length ? `
+    <div class="card">
+      <div class="card-head"><h3>Dossiers importés non liés</h3><span class="badge-count">${unmatchedKeys.length}</span></div>
+      <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${unmatchedKeys.map(k => `<span class="btn sm" data-quick-link="${escapeHtml(k)}" style="cursor:pointer">${escapeHtml(k)} +</span>`).join("")}
+        </div>
+      </div>
+    </div>` : ""}
+
+    <div class="card">
+      ${rows.length === 0 ? `<div class="empty"><div class="big">◇</div>Aucun projet pour l'instant.</div>` : `
+      <table>
+        <thead><tr><th>Projet</th><th>Client</th><th>Clés liées (dossiers)</th><th class="num">Taux $/h</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map(p => {
+            const client = state.clients.find(c => c.id === p.clientId);
+            return `<tr class="clickable" data-edit-project="${p.id}">
+              <td><strong>${escapeHtml(p.name)}</strong></td>
+              <td>${escapeHtml(client ? client.name : "—")}</td>
+              <td>${(p.projectKeys || []).map(k => `<code class="k">${escapeHtml(k)}</code>`).join(" ") || "—"}</td>
+              <td class="num mono">${p.rate ? p.rate : "—"}</td>
+              <td style="text-align:right"><button class="btn ghost sm" data-del-project="${p.id}">Supprimer</button></td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`}
+    </div>
+  `;
+}
+
+/* ---- import ---- */
+function renderImport() {
+  return `
+    <div class="pagehead"><div><h1>Importer la consommation</h1><div class="desc">Synchronise les tokens depuis tes logs Claude Code locaux</div></div></div>
+
+    <div class="card">
+      <div class="card-head"><h3>1 — Automatiser la génération</h3><span class="hint">une seule fois</span></div>
+      <div class="card-body">
+        <p style="margin:0 0 10px;color:var(--ink-dim)">Depuis le dossier <code class="k">c-sha</code>, lance l'installateur — il programme une synchro automatique en tâche de fond (toutes les 4h) qui recopie l'export dans le presse-papiers :</p>
+        <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">./install_autosync.sh</pre>
+        <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Le presse-papiers est ensuite tenu à jour tout seul. Il te suffit de revenir sur cette page et de cliquer "Importer" ci-dessous — plus besoin de retourner dans le terminal.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>2 — Importer</h3></div>
+      <div class="card-body">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+          <button class="btn primary" id="btn-import-clipboard">⇩ Importer depuis le presse-papiers</button>
+          <span class="hint" id="import-status" style="color:var(--ink-faint);font-size:12.5px"></span>
+        </div>
+        <details>
+          <summary style="cursor:pointer;color:var(--ink-dim);font-size:12.5px">Coller manuellement à la place</summary>
+          <div class="field" style="margin-top:10px">
+            <textarea id="import-json" placeholder='{"exportedAt":"...","projects":[...]}'></textarea>
+          </div>
+          <button class="btn" id="btn-import-manual">Importer ce texte</button>
+        </details>
+      </div>
+    </div>
+  `;
+}
+
+/* ---- settings / pricing ---- */
+function renderSettings() {
+  const pricing = state.pricing || DEFAULT_PRICING;
+  const models = Object.keys(pricing.models);
+  return `
+    <div class="pagehead"><div><h1>Tarifs</h1><div class="desc">Prix par million de tokens, utilisés pour estimer le coût</div></div></div>
+    <div class="card">
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Modèle</th><th class="num">Input $/M</th><th class="num">Output $/M</th><th class="num">Cache write $/M</th><th class="num">Cache read $/M</th></tr></thead>
+          <tbody>
+            ${models.map(m => {
+              const p = pricing.models[m];
+              return `<tr>
+                <td>${escapeHtml(modelLabel(m))}</td>
+                <td class="num"><input class="mono" data-price="${m}" data-field="in" type="number" step="0.01" value="${p.in}" style="width:70px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)"></td>
+                <td class="num"><input class="mono" data-price="${m}" data-field="out" type="number" step="0.01" value="${p.out}" style="width:70px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)"></td>
+                <td class="num"><input class="mono" data-price="${m}" data-field="cacheWrite" type="number" step="0.01" value="${p.cacheWrite}" style="width:70px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)"></td>
+                <td class="num"><input class="mono" data-price="${m}" data-field="cacheRead" type="number" step="0.01" value="${p.cacheRead}" style="width:70px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)"></td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+      <div class="mf" style="display:flex;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--border)">
+        <button class="btn primary" id="btn-save-pricing">Enregistrer</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------- modals ---------------- */
+function openModal(html) {
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.id = "modal-backdrop";
+  wrap.innerHTML = `<div class="modal">${html}</div>`;
+  wrap.addEventListener("click", e => { if (e.target === wrap) closeModal(); });
+  document.body.appendChild(wrap);
+}
+function closeModal() {
+  const el = document.getElementById("modal-backdrop");
+  if (el) el.remove();
+}
+
+function clientModal(existing) {
+  const c = existing || {};
+  openModal(`
+    <div class="mh">${existing ? "Modifier le client" : "Nouveau client"}</div>
+    <div class="mb">
+      <div class="field"><label>Nom</label><input id="m-name" value="${escapeHtml(c.name || "")}" placeholder="Ada Lovelace"></div>
+      <div class="row2">
+        <div class="field"><label>Société</label><input id="m-company" value="${escapeHtml(c.company || "")}" placeholder="Analytical Engines Inc."></div>
+        <div class="field"><label>Email</label><input id="m-email" value="${escapeHtml(c.email || "")}" placeholder="ada@example.com"></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="m-notes" style="min-height:80px">${escapeHtml(c.notes || "")}</textarea></div>
+    </div>
+    <div class="mf">
+      <button class="btn ghost" id="m-cancel">Annuler</button>
+      <button class="btn primary" id="m-save">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById("m-cancel").onclick = closeModal;
+  document.getElementById("m-save").onclick = async () => {
+    const name = document.getElementById("m-name").value.trim();
+    if (!name) { toast("Le nom est requis"); return; }
+    const data = {
+      name,
+      company: document.getElementById("m-company").value.trim(),
+      email: document.getElementById("m-email").value.trim(),
+      notes: document.getElementById("m-notes").value.trim(),
+      updatedAt: new Date().toISOString(),
+    };
+    if (!state.db) { toast("Stockage indisponible"); return; }
+    if (existing) {
+      await state.db.doc("clients/" + existing.id).update(data);
+    } else {
+      data.createdAt = data.updatedAt;
+      await state.db.collection("clients").add(data);
+    }
+    closeModal();
+    toast("Client enregistré");
+  };
+}
+
+function projectModal(existing, presetKey) {
+  const p = existing || {};
+  const clientOptions = state.clients.map(c => `<option value="${c.id}" ${p.clientId === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+  openModal(`
+    <div class="mh">${existing ? "Modifier le projet" : "Nouveau projet"}</div>
+    <div class="mb">
+      <div class="field"><label>Nom du projet</label><input id="m-name" value="${escapeHtml(p.name || presetKey || "")}" placeholder="Refonte du site vitrine"></div>
+      <div class="field"><label>Client</label><select id="m-client"><option value="">— aucun —</option>${clientOptions}</select></div>
+      <div class="field"><label>Clés de dossier liées (une par ligne — nom du dossier local)</label><textarea id="m-keys" style="min-height:70px;font-family:'IBM Plex Mono',monospace">${escapeHtml((p.projectKeys || (presetKey ? [presetKey] : [])).join("\n"))}</textarea></div>
+      <div class="field"><label>Taux horaire facturé ($/h, optionnel)</label><input id="m-rate" type="number" step="1" value="${p.rate || ""}" placeholder="150"></div>
+    </div>
+    <div class="mf">
+      <button class="btn ghost" id="m-cancel">Annuler</button>
+      <button class="btn primary" id="m-save">Enregistrer</button>
+    </div>
+  `);
+  document.getElementById("m-cancel").onclick = closeModal;
+  document.getElementById("m-save").onclick = async () => {
+    const name = document.getElementById("m-name").value.trim();
+    if (!name) { toast("Le nom est requis"); return; }
+    const keys = document.getElementById("m-keys").value.split("\n").map(s => s.trim()).filter(Boolean);
+    const data = {
+      name,
+      clientId: document.getElementById("m-client").value || null,
+      projectKeys: keys,
+      rate: parseFloat(document.getElementById("m-rate").value) || null,
+      updatedAt: new Date().toISOString(),
+    };
+    if (!state.db) { toast("Stockage indisponible"); return; }
+    if (existing) {
+      await state.db.doc("projects/" + existing.id).update(data);
+    } else {
+      data.createdAt = data.updatedAt;
+      await state.db.collection("projects").add(data);
+    }
+    closeModal();
+    toast("Projet enregistré");
+  };
+}
+
+/* ---------------- import logic ---------------- */
+function parseLedgerJson(raw) {
+  const parsed = JSON.parse(raw);
+  if (!parsed.projects || !Array.isArray(parsed.projects)) {
+    throw new Error("Format inattendu (clé 'projects' manquante).");
+  }
+  return parsed;
+}
+
+async function importLedgerData(parsed, statusEl) {
+  if (!state.db) { statusEl.textContent = "Stockage indisponible."; return; }
+  statusEl.textContent = "Import en cours…";
+  let docsWritten = 0;
+  for (const proj of parsed.projects) {
+    const pkey = proj.projectKey;
+    for (const month of proj.months || []) {
+      for (const m of month.models || []) {
+        const docId = `${pkey}__${month.yyyymm}__${m.model}`.replace(/[^a-zA-Z0-9_.\-~:@+]/g, "_").slice(0, 200);
+        await state.db.doc("usage/" + docId).set({
+          projectKey: pkey,
+          yyyymm: month.yyyymm,
+          model: m.model,
+          totals: m.totals,
+          daily: m.daily,
+          importedAt: new Date().toISOString(),
+        });
+        docsWritten++;
+      }
+    }
+  }
+  state.lastImportSignature = null;
+  statusEl.textContent = `Importé : ${docsWritten} enregistrement(s) (${parsed.messageCount || "?"} messages sources).`;
+  toast("Import terminé");
+}
+
+async function handleImportFromClipboard() {
+  const statusEl = document.getElementById("import-status");
+  try {
+    const raw = await navigator.clipboard.readText();
+    const parsed = parseLedgerJson(raw);
+    state.lastImportSignature = raw.length + ":" + parsed.exportedAt;
+    await importLedgerData(parsed, statusEl);
+  } catch (e) {
+    statusEl.textContent = e.name === "NotAllowedError"
+      ? "Accès au presse-papiers refusé — utilise le collage manuel ci-dessous."
+      : "Rien d'exploitable dans le presse-papiers : " + e.message;
+  }
+}
+
+async function handleImportManual() {
+  const raw = document.getElementById("import-json").value.trim();
+  const statusEl = document.getElementById("import-status");
+  if (!raw) { statusEl.textContent = "Colle d'abord le JSON exporté."; return; }
+  try {
+    const parsed = parseLedgerJson(raw);
+    await importLedgerData(parsed, statusEl);
+    document.getElementById("import-json").value = "";
+  } catch (e) {
+    statusEl.textContent = "JSON invalide : " + e.message;
+  }
+}
+
+async function checkClipboardForBanner() {
+  try {
+    const perm = await navigator.permissions.query({ name: "clipboard-read" });
+    if (perm.state !== "granted") return;
+    const raw = await navigator.clipboard.readText();
+    const parsed = parseLedgerJson(raw);
+    const sig = raw.length + ":" + parsed.exportedAt;
+    if (sig === state.lastImportSignature) return;
+    state.clipboardCandidate = { raw, parsed, sig };
+    render();
+  } catch (e) { /* no readable/valid clipboard data — stay quiet */ }
+}
+
+/* ---------------- wiring ---------------- */
+function wireView() {
+  document.querySelectorAll("[data-nav]").forEach(el => {
+    el.onclick = () => { state.view = el.dataset.nav; render(); };
+  });
+
+  const addClientBtn = document.getElementById("btn-add-client");
+  if (addClientBtn) addClientBtn.onclick = () => clientModal(null);
+  document.querySelectorAll("[data-edit-client]").forEach(el => {
+    el.onclick = () => clientModal(state.clients.find(c => c.id === el.dataset.editClient));
+  });
+  document.querySelectorAll("[data-del-client]").forEach(el => {
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      if (!state.db) return;
+      await state.db.doc("clients/" + el.dataset.delClient).delete();
+      toast("Client supprimé");
+    };
+  });
+
+  const addProjectBtn = document.getElementById("btn-add-project");
+  if (addProjectBtn) addProjectBtn.onclick = () => projectModal(null);
+  document.querySelectorAll("[data-edit-project]").forEach(el => {
+    el.onclick = () => projectModal(state.projects.find(p => p.id === el.dataset.editProject));
+  });
+  document.querySelectorAll("[data-del-project]").forEach(el => {
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      if (!state.db) return;
+      await state.db.doc("projects/" + el.dataset.delProject).delete();
+      toast("Projet supprimé");
+    };
+  });
+  document.querySelectorAll("[data-quick-link]").forEach(el => {
+    el.onclick = () => projectModal(null, el.dataset.quickLink);
+  });
+
+  const importClipBtn = document.getElementById("btn-import-clipboard");
+  if (importClipBtn) importClipBtn.onclick = handleImportFromClipboard;
+  const importManualBtn = document.getElementById("btn-import-manual");
+  if (importManualBtn) importManualBtn.onclick = handleImportManual;
+
+  const applyClipBtn = document.getElementById("btn-apply-clip");
+  if (applyClipBtn) applyClipBtn.onclick = async () => {
+    const { parsed, sig } = state.clipboardCandidate;
+    state.lastImportSignature = sig;
+    state.clipboardCandidate = null;
+    const fakeStatus = { set textContent(v) { toast(v); } };
+    await importLedgerData(parsed, fakeStatus);
+    render();
+  };
+  const dismissClipBtn = document.getElementById("btn-dismiss-clip");
+  if (dismissClipBtn) dismissClipBtn.onclick = () => {
+    state.lastImportSignature = state.clipboardCandidate.sig;
+    state.clipboardCandidate = null;
+    render();
+  };
+
+  const savePricingBtn = document.getElementById("btn-save-pricing");
+  if (savePricingBtn) savePricingBtn.onclick = async () => {
+    if (!state.db) return;
+    const pricing = JSON.parse(JSON.stringify(state.pricing || DEFAULT_PRICING));
+    document.querySelectorAll("[data-price]").forEach(input => {
+      const model = input.dataset.price, field = input.dataset.field;
+      if (!pricing.models[model]) pricing.models[model] = {};
+      pricing.models[model][field] = parseFloat(input.value) || 0;
+    });
+    pricing.updatedAt = new Date().toISOString();
+    await state.db.doc("settings/pricing").set(pricing);
+    toast("Tarifs enregistrés");
+  };
+}
+
+/* ---------------- nav ---------------- */
+document.querySelectorAll("nav .navitem").forEach(btn => {
+  btn.addEventListener("click", () => { state.view = btn.dataset.view; render(); });
+});
+
+state.pricing = DEFAULT_PRICING;
+render();
+initDb();
+
+checkClipboardForBanner();
+window.addEventListener("focus", checkClipboardForBanner);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) checkClipboardForBanner(); });
+</script>
