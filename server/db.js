@@ -59,8 +59,10 @@ db.exec(`
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     hostname TEXT,
+    client_id TEXT,
     first_seen TEXT NOT NULL,
-    last_seen TEXT NOT NULL
+    last_seen TEXT NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
   );
 
   CREATE TABLE IF NOT EXISTS settings (
@@ -87,6 +89,7 @@ if (!projectCols.includes("billing_mode")) {
   db.exec("ALTER TABLE projects ADD COLUMN billing_mode TEXT NOT NULL DEFAULT 'tokens'");
 }
 
+/* migration: devices predates client linking */
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
