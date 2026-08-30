@@ -1977,8 +1977,8 @@ function docsInstallStepList(os, pythonMode) {
   if (noPython) {
     return [
       `Ouvre un terminal.`,
-      `Colle cette commande en remplaçant l'URL et la clé :
-        ${docsCodeBlock(`LEDGER_URL="https://ton-serveur.com" LEDGER_SYNC_API_KEY="colle-ta-cle-ici" \\\n  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"`)}`,
+      `Colle cette commande (URL et clé déjà remplies pour ce serveur) :
+        ${docsCodeBlock(`LEDGER_URL="${docsRealUrl()}" LEDGER_SYNC_API_KEY="${docsRealKey()}" \\\n  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"`)}`,
       `Le script télécharge <code class="k">ledger-agent-linux</code> dans <code class="k">~/.ledger/bin/</code> et l'enregistre comme service <code class="k">systemd --user</code> (redémarre tout seul en cas d'arrêt). Si <code class="k">systemd --user</code> n'est pas disponible (certains conteneurs/VPS minimalistes), repli automatique sur une entrée <code class="k">crontab</code>.`,
     ];
   }
