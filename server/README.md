@@ -53,16 +53,44 @@ Fais-le tourner avec `pm2`, `systemd` ou équivalent pour qu'il redémarre tout 
 
 ## Brancher la synchro automatique locale
 
-Une fois le serveur en ligne, sur ta machine (à la racine du projet, pas dans `server/`) :
+Cross-platform (Windows / macOS / Linux, Python standard uniquement — aucune
+dépendance à installer). Une fois le serveur en ligne, sur ta machine (à la
+racine du projet, pas dans `server/`) :
 
 ```bash
-./configure_sync.sh      # colle l'URL du serveur + la cle API de sync (une fois)
-./install_autosync.sh    # programme la synchro toutes les 4h (une fois)
+python3 configure_sync.py    # colle l'URL du serveur + la cle API de sync (une fois)
+python3 install_autosync.py  # programme la synchro (une fois)
 ```
 
-`sync_usage.sh` lit ensuite `~/.claude/projects/**/*.jsonl`, agrège les tokens
+Sur Windows, remplace `python3` par `python`. `install_autosync.py` détecte
+l'OS et utilise le planificateur natif :
+
+- **macOS** : LaunchAgent (`launchd`) — les scripts sont copiés dans
+  `~/Library/Application Support/Ledger/` car `launchd` ne peut pas accéder
+  aux fichiers sous `~/Documents` (protection TCC).
+- **Linux** : entrée `crontab` (vérification chaque minute).
+- **Windows** : tâche planifiée (`schtasks`, nom `LedgerTokenSync`).
+
+`sync_usage.py` lit ensuite `~/.claude/projects/**/*.jsonl`, agrège les tokens
 et les pousse directement sur `POST /api/sync` du serveur — sans presse-papiers,
-sans copier-coller, sans navigateur ouvert.
+sans copier-coller, sans navigateur ouvert. Config et logs dans `~/.ledger/`
+(identique sur les trois OS). Pour désinstaller : `python3 uninstall_autosync.py`.
+
+### Sans Python installé
+
+Télécharge le binaire correspondant à ton OS depuis la page **Releases** du
+dépôt GitHub (`ledger-agent-macos`, `ledger-agent-linux`, `ledger-agent-windows.exe`)
+— aucune dépendance à installer. Il regroupe les mêmes commandes :
+
+```bash
+./ledger-agent-macos configure   # equivalent de configure_sync.py
+./ledger-agent-macos install     # equivalent de install_autosync.py
+./ledger-agent-macos uninstall   # equivalent de uninstall_autosync.py
+```
+
+Sur macOS/Linux, rends-le exécutable avant le premier lancement :
+`chmod +x ledger-agent-macos`. Les binaires sont générés automatiquement par
+`.github/workflows/release.yml` à chaque tag `v*` poussé sur le dépôt.
 
 ## Variables d'environnement
 
@@ -71,7 +99,7 @@ sans copier-coller, sans navigateur ouvert.
 | `PORT` | Port d'écoute HTTP | `3000` |
 | `CRM_USER` | Utilisateur Basic Auth de l'interface | `admin` |
 | `CRM_PASSWORD` | Mot de passe Basic Auth de l'interface | généré au 1er démarrage |
-| `SYNC_API_KEY` | Clé Bearer pour `POST /api/sync` (utilisée par `sync_usage.sh`) | générée au 1er démarrage |
+| `SYNC_API_KEY` | Clé Bearer pour `POST /api/sync` (utilisée par `sync_usage.py`) | générée au 1er démarrage |
 
 ## Endpoints
 
