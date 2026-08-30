@@ -53,22 +53,18 @@ def project_key(cwd: str | None) -> str:
     return Path(cwd).name or cwd
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--days", type=int, default=None, help="Limiter aux N derniers jours")
-    parser.add_argument("--root", type=str, default=str(CLAUDE_DIR), help="Dossier des logs Claude Code")
-    parser.add_argument("--device-id", type=str, default=None, help="Identifiant de cet appareil (genere par install_autosync.sh)")
-    parser.add_argument("--device-name", type=str, default=None, help="Nom lisible de cet appareil (ex: nom de la machine)")
-    args = parser.parse_args()
-
-    root = Path(args.root)
+def generate_export(days: int | None = None, device_id: str | None = None,
+                     device_name: str | None = None, root: Path | str = CLAUDE_DIR) -> tuple[dict, int]:
+    """Agrege les logs locaux et renvoie (result_dict, message_count). Utilisee
+    directement (import) par ledger_core.py — evite un sous-processus quand
+    l'agent est empaquete en executable autonome (PyInstaller)."""
+    root = Path(root)
     if not root.exists():
-        print(f"Dossier introuvable: {root}", file=sys.stderr)
-        sys.exit(1)
+        raise FileNotFoundError(f"Dossier introuvable: {root}")
 
     cutoff = None
-    if args.days is not None:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=args.days)
+    if days is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
     # aggregation[projectKey][yyyy-mm][model]['daily'][yyyy-mm-dd] = {input, output, cache_creation, cache_read}
     agg = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {
@@ -112,13 +108,29 @@ def main():
     result = {
         "exportedAt": datetime.now(timezone.utc).isoformat(),
         "messageCount": count,
-        "deviceId": args.device_id,
-        "deviceName": args.device_name,
+        "deviceId": device_id,
+        "deviceName": device_name,
         "projects": out_projects,
     }
+    return result, count
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--days", type=int, default=None, help="Limiter aux N derniers jours")
+    parser.add_argument("--root", type=str, default=str(CLAUDE_DIR), help="Dossier des logs Claude Code")
+    parser.add_argument("--device-id", type=str, default=None, help="Identifiant de cet appareil (genere par install_autosync.py)")
+    parser.add_argument("--device-name", type=str, default=None, help="Nom lisible de cet appareil (ex: nom de la machine)")
+    args = parser.parse_args()
+
+    try:
+        result, count = generate_export(args.days, args.device_id, args.device_name, args.root)
+    except FileNotFoundError as e:
+        print(str(e), file=sys.stderr)
+        sys.exit(1)
 
     print(json.dumps(result, separators=(",", ":")))
-    print(f"{count} messages agreges sur {len(out_projects)} projet(s).", file=sys.stderr)
+    print(f"{count} messages agreges sur {len(result['projects'])} projet(s).", file=sys.stderr)
 
 
 if __name__ == "__main__":
