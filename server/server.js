@@ -249,7 +249,7 @@ function getDeviceBillingSummary(deviceId) {
     if (amount > 0) entries.push({ invoiceId: inv.id, date: inv.created_at, amount, status: inv.status });
   }
   const totalPaid = entries.filter(e => e.status === "paid").reduce((s, e) => s + e.amount, 0);
-  return { totalBilled, totalPaid, totalPending: totalBilled - totalPaid, entries };
+  return { totalPaid, entries };
 }
 
 app.get("/api/device-view/:deviceId/:token", requireDeviceToken, (req, res) => {
