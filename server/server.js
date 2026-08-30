@@ -245,6 +245,14 @@ function getDeviceBillingSummary(deviceId) {
   for (const inv of invoices) {
     let items;
     try { items = JSON.parse(inv.line_items || "[]"); } catch (e) { items = []; }
+    const amount = items.filter(it => it.deviceId === deviceId).reduce((s, it) => s + (it.amount || 0), 0);
+    if (amount > 0) entries.push({ invoiceId: inv.id, date: inv.created_at, amount, status: inv.status });
+  }
+  const totalBilled = entries.reduce((s, e) => s + e.amount, 0);
+  const totalPaid = entries.filter(e => e.status === "paid").reduce((s, e) => s + e.amount, 0);
+  return { totalBilled, totalPaid, totalPending: totalBilled - totalPaid, entries };
+}
+
 app.get("/api/device-view/:deviceId/:token", requireDeviceToken, (req, res) => {
   const d = db.prepare("SELECT * FROM devices WHERE id = ?").get(req.params.deviceId);
   const lastDataRow = db.prepare("SELECT MAX(imported_at) at FROM usage_entries WHERE device_id = ?").get(req.params.deviceId);
@@ -256,6 +264,7 @@ app.get("/api/device-view/:deviceId/:token", requireDeviceToken, (req, res) => {
     rows: getDeviceDailyRows(req.params.deviceId),
     pricing: getPricing(),
     projectNames: getProjectNamesMap(),
+    billing: getDeviceBillingSummary(req.params.deviceId),
   });
 });
 
