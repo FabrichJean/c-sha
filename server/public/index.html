@@ -862,23 +862,55 @@ function renderDashboard() {
 /* ---- vue detaillee d'un appareil ---- */
 function renderDeviceDetail() {
   const device = state.devices.find(d => d.id === state.selectedDeviceId);
-              const proj = projectForKey(pkey);
-              const client = clientForProject(proj);
-              const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
-              return `<tr>
-                <td>${escapeHtml(proj ? proj.name : pkey)}${!proj ? ` <span class="hint" style="color:var(--warn)">· non lié</span>` : ""}</td>
-                <td>${escapeHtml(client ? client.name : "—")}</td>
-                <td class="num mono">${fmtNum(t.input)}</td>
-                <td class="num mono">${fmtNum(t.output)}</td>
-                <td class="num mono">${fmtNum(t.cacheCreate + t.cacheRead)}</td>
-                <td class="num mono">${fmtNum(totalTokens(t))}</td>
-                <td class="num mono">${fmtUsd(cost)}</td>
-              </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
+  if (!device) {
+    state.view = "devices";
+    return renderDevices();
+  }
+  const rows = allDailyRows().filter(r => r.deviceId === device.id);
+  const st = deviceStatus(device);
+  const dotColor = st.historic ? "var(--ink-faint)" : st.seen ? "var(--good)" : "var(--warn)";
+  const lastImported = state.usage.filter(u => u.deviceId === device.id).reduce((max, u) => !max || u.importedAt > max ? u.importedAt : max, null);
+
+  const header = `
+    <div class="pagehead">
+      <div>
+        <button class="link-arrow" data-nav="devices" style="margin-bottom:8px;display:inline-block">← Appareils</button>
+        <h1>${escapeHtml(device.name)}</h1>
+        <div class="desc">Statistiques propres à cet appareil</div>
       </div>
+      ${device.id !== "legacy" ? `<button class="btn" data-rename-device="${device.id}">Renommer</button>` : ""}
     </div>
+    <div class="card">
+      <div class="card-body" style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="dot" style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${dotColor}"></span>
+          <strong>${st.label}</strong>
+        </div>
+        ${device.hostname && device.hostname !== device.name ? `<div><div class="hint" style="color:var(--ink-faint)">Machine</div><div style="font-size:13px">${escapeHtml(device.hostname)}</div></div>` : ""}
+        ${device.firstSeen ? `<div><div class="hint" style="color:var(--ink-faint)">Premier contact</div><div class="mono" style="font-size:13px">${new Date(device.firstSeen).toLocaleDateString("fr-FR")}</div></div>` : ""}
+        ${device.lastSeen ? `<div><div class="hint" style="color:var(--ink-faint)">Dernier contact</div><div class="mono" style="font-size:13px">${timeAgo(device.lastSeen)}</div></div>` : ""}
+        <div><div class="hint" style="color:var(--ink-faint)">Dernière donnée reçue</div><div class="mono" style="font-size:13px">${lastImported ? timeAgo(lastImported) : "—"}</div></div>
+      </div>
+    </div>`;
+
+  if (rows.length === 0) {
+    return `${header}<div class="card"><div class="empty"><div class="big">▧</div>Aucune conso reçue pour cet appareil pour l'instant.</div></div>`;
+  }
+
+  const now = new Date();
+  const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+  const in30 = rows.filter(r => r.date >= d30.toISOString().slice(0, 10));
+  const byProject = aggregate(in30, r => r.projectKey);
+  const projectEntries = [...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
+
+  return `
+    ${header}
+    ${buildKpiSection(rows)}
+    <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:14px;align-items:start;margin-bottom:20px">
+      ${buildTrendCard(rows)}
+      ${buildDonutCard(projectEntries)}
+    </div>
+    ${buildDetailTableCard(projectEntries, in30)}
   `;
 }
 
@@ -999,7 +1031,7 @@ function renderDevices() {
           ${perDevice.map(d => {
             const st = deviceStatus(d);
             const dotColor = st.historic ? "var(--ink-faint)" : st.seen ? "var(--good)" : "var(--warn)";
-            return `<tr>
+            return `<tr class="clickable" data-view-device="${d.id}">
               <td>
                 <strong>${escapeHtml(d.name)}</strong>
                 ${d.hostname && d.hostname !== d.name ? `<div class="hint" style="color:var(--ink-faint)">${escapeHtml(d.hostname)}</div>` : ""}
@@ -1336,11 +1368,15 @@ function wireView() {
   });
   document.querySelectorAll("[data-quick-link]").forEach(el => { el.onclick = () => projectModal(null, el.dataset.quickLink); });
 
+  document.querySelectorAll("[data-view-device]").forEach(el => {
+    el.onclick = () => { state.selectedDeviceId = el.dataset.viewDevice; state.view = "device-detail"; render(); };
+  });
   document.querySelectorAll("[data-rename-device]").forEach(el => {
-    el.onclick = () => deviceModal(state.devices.find(d => d.id === el.dataset.renameDevice));
+    el.onclick = (e) => { e.stopPropagation(); deviceModal(state.devices.find(d => d.id === el.dataset.renameDevice)); };
   });
   document.querySelectorAll("[data-del-device]").forEach(el => {
-    el.onclick = async () => {
+    el.onclick = async (e) => {
+      e.stopPropagation();
       try { await api("/api/devices/" + el.dataset.delDevice, { method: "DELETE" }); toast("Appareil supprimé"); await loadState(); }
       catch (err) { toast("Erreur : " + err.message); }
     };
