@@ -28,6 +28,14 @@ if [ ! -f "$DEVICE_FILE" ]; then
   cat > "$DEVICE_FILE" <<EOF
 DEVICE_ID="$DEVICE_ID"
 DEVICE_NAME="$DEVICE_NAME"
+EOF
+  echo "Nouvel appareil enregistre : $DEVICE_NAME ($DEVICE_ID)"
+else
+  # shellcheck source=/dev/null
+  source "$DEVICE_FILE"
+  echo "Appareil existant reutilise : $DEVICE_NAME ($DEVICE_ID)"
+fi
+
 PLIST_LABEL="com.mdledger.tokensync"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 
