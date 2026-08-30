@@ -1046,7 +1046,12 @@ function renderInvoices() {
               <td><strong>${escapeHtml(client ? client.name : "Client supprimé")}</strong></td>
               <td class="mono">${inv.periodStart ? `${inv.periodStart} → ${inv.periodEnd}` : "—"}</td>
               <td class="num mono">${fmtUsd(inv.total)}</td>
-              <td><span class="dot" style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${INVOICE_STATUS_COLORS[inv.status]};margin-right:6px"></span>${INVOICE_STATUS_LABELS[inv.status] || inv.status}</td>
+              <td>
+                <span class="dot" style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${INVOICE_STATUS_COLORS[inv.status]};margin-right:6px"></span>
+                <select data-quick-invoice-status="${inv.id}" style="border:1px solid var(--border);border-radius:6px;padding:3px 6px;background:var(--bg);color:var(--ink);font-size:12.5px">
+                  ${["draft", "sent", "paid"].map(s => `<option value="${s}" ${inv.status === s ? "selected" : ""}>${INVOICE_STATUS_LABELS[s]}</option>`).join("")}
+                </select>
+              </td>
               <td class="hint" style="color:var(--ink-faint)">${new Date(inv.createdAt).toLocaleDateString("fr-FR")}</td>
               <td style="text-align:right"><button class="btn ghost sm" data-del-invoice="${inv.id}">Supprimer</button></td>
             </tr>`;
@@ -1847,6 +1852,9 @@ function wireView() {
       } catch (err) { toast("Erreur : " + err.message); }
     };
   });
+  document.querySelectorAll("[data-quick-invoice-status]").forEach(el => {
+    el.onclick = (e) => e.stopPropagation();
+    el.onchange = async (e) => {
   document.querySelectorAll("[data-set-invoice-status]").forEach(el => {
     el.onclick = async () => {
       try {
