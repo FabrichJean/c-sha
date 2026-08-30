@@ -21,3 +21,18 @@ if [ -z "${LEDGER_URL:-}" ] || [ -z "${LEDGER_API_KEY:-}" ]; then
   echo "$(date '+%Y-%m-%d %H:%M:%S') — config incomplete (LEDGER_URL / LEDGER_API_KEY)" >> "$LOG_DIR/sync.log"
   exit 1
 fi
+
+PAYLOAD="$(python3 "$DIR/export_usage.py" --days 90 2>>"$LOG_DIR/sync.log")"
+
+HTTP_CODE=$(curl -sS -o "$LOG_DIR/last_response.json" -w "%{http_code}" \
+  -X POST "${LEDGER_URL%/}/api/sync" \
+  -H "Authorization: Bearer $LEDGER_API_KEY" \
+  -H "Content-Type: application/json" \
+  --data-binary "$PAYLOAD")
+
+if [ "$HTTP_CODE" = "200" ]; then
+  echo "$(date '+%Y-%m-%d %H:%M:%S') — sync OK ($HTTP_CODE) -> $LEDGER_URL" >> "$LOG_DIR/sync.log"
+else
+  echo "$(date '+%Y-%m-%d %H:%M:%S') — echec sync (HTTP $HTTP_CODE) -> voir $LOG_DIR/last_response.json" >> "$LOG_DIR/sync.log"
+  exit 1
+fi
