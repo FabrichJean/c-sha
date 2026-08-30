@@ -1474,10 +1474,11 @@ function renderDevices() {
     <div class="card">
       <div class="card-head"><h3>Enregistrer un nouvel appareil</h3></div>
       <div class="card-body">
-        <p style="margin:0 0 10px;color:var(--ink-dim)">Sur la machine à ajouter, à la racine du projet :</p>
-        <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">./configure_sync.sh
-./install_autosync.sh</pre>
-        <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Un identifiant unique est généré au premier <code class="k">install_autosync.sh</code> et réutilisé ensuite — pas besoin de le créer ici.</p>
+        <p style="margin:0 0 10px;color:var(--ink-dim)">Sur la machine à ajouter, à la racine du projet (Windows, macOS ou Linux) :</p>
+        <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">python3 configure_sync.py
+python3 install_autosync.py</pre>
+        <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Un identifiant unique est généré au premier <code class="k">install_autosync.py</code> et réutilisé ensuite — pas besoin de le créer ici. Sur Windows, remplace <code class="k">python3</code> par <code class="k">python</code>.</p>
+        <p style="margin:8px 0 0;color:var(--ink-dim);font-size:12.5px">Pas de Python installé ? Télécharge le binaire correspondant à ton OS depuis la page Releases du dépôt GitHub, puis lance <code class="k">./ledger-agent configure</code> et <code class="k">./ledger-agent install</code>.</p>
       </div>
     </div>
 
@@ -1553,8 +1554,8 @@ function renderImport() {
         </div>
       </div>
       ${!agent.seen ? `<div class="card-body" style="padding-top:0;color:var(--ink-dim);font-size:12.5px">
-        Sur ta machine : <code class="k">./configure_sync.sh</code> puis <code class="k">./install_autosync.sh</code> (une seule fois chacun).
-        Logs : <code class="k">~/Library/Logs/ledger-autosync/sync.log</code>
+        Sur ta machine : <code class="k">python3 configure_sync.py</code> puis <code class="k">python3 install_autosync.py</code> (une seule fois chacun).
+        Logs : <code class="k">~/.ledger/logs/sync.log</code>
       </div>` : ""}
     </div>`;
   const statusCard = sync ? `
@@ -1579,10 +1580,11 @@ function renderImport() {
     <div class="card">
       <div class="card-head"><h3>Comment ça marche</h3></div>
       <div class="card-body">
-        <p style="margin:0 0 10px;color:var(--ink-dim)">Sur ta machine, un job planifié exécute <code class="k">sync_usage.sh</code> toutes les 4h. Il lit tes logs Claude Code locaux et pousse directement le résultat ici :</p>
-        <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">python3 export_usage.py --days 90 | curl -sS -X POST "$LEDGER_URL/api/sync" \\
-  -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d @-</pre>
-        <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Rien à faire de ton côté une fois installé — cette page se met à jour toute seule.</p>
+        <p style="margin:0 0 10px;color:var(--ink-dim)">Sur ta machine, un planificateur natif (launchd sur Mac, cron sur Linux, Planificateur de tâches sur Windows) exécute <code class="k">sync_usage.py</code> toutes les minutes. Il lit tes logs Claude Code locaux et pousse le résultat ici dès qu'une synchro est due :</p>
+        <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">python3 configure_sync.py
+python3 install_autosync.py</pre>
+        <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Fonctionne à l'identique sur Windows, macOS et Linux (Python standard, aucune dépendance). Rien à faire de ton côté une fois installé — cette page se met à jour toute seule.</p>
+        <p style="margin:8px 0 0;color:var(--ink-dim);font-size:12.5px">Pas de Python installé ? Télécharge le binaire correspondant à ton OS (<code class="k">ledger-agent-macos</code>, <code class="k">ledger-agent-linux</code>, <code class="k">ledger-agent-windows.exe</code>) depuis la page Releases du dépôt GitHub — mêmes commandes, en remplaçant <code class="k">python3 configure_sync.py</code> par <code class="k">./ledger-agent configure</code>, et de même pour <code class="k">install</code>/<code class="k">uninstall</code>.</p>
       </div>
     </div>
 
