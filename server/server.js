@@ -403,7 +403,8 @@ app.delete("/api/projects/:id", (req, res) => {
 /* ---------------- factures (facturation virtuelle factice) ---------------- */
 app.post("/api/invoices", (req, res) => {
   const { clientId, periodStart, periodEnd, lineItems, total, notes } = req.body;
-  if (!clientId || !periodStart || !periodEnd) return res.status(400).json({ error: "Client et periode requis." });
+  if (!clientId) return res.status(400).json({ error: "Client requis." });
+  if (!Array.isArray(lineItems) || lineItems.length === 0) return res.status(400).json({ error: "Au moins une ligne est requise." });
   const now = new Date().toISOString();
   const row = {
     id: uid(), client_id: clientId, period_start: periodStart, period_end: periodEnd,
