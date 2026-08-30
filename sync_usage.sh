@@ -30,6 +30,14 @@ if [ -z "${LEDGER_URL:-}" ] || [ -z "${LEDGER_API_KEY:-}" ]; then
 fi
 BASE_URL="${LEDGER_URL%/}"
 
+# Identite de cet appareil (generee par install_autosync.sh, a cote de ce script).
+DEVICE_ID=""
+DEVICE_NAME=""
+if [ -f "$DIR/device.conf" ]; then
+  # shellcheck source=/dev/null
+  source "$DIR/device.conf"
+fi
+urlencode() { python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$1"; }
 do_sync() {
   local reason="$1"
   PAYLOAD="$(python3 "$DIR/export_usage.py" --days 90 2>>"$LOG_DIR/sync.log")"
