@@ -241,6 +241,7 @@
     <button class="navitem" data-view="clients"><span class="ic" style="color:var(--violet)">◔</span>Clients</button>
     <button class="navitem" data-view="projects"><span class="ic" style="color:#c9622a">◇</span>Projets</button>
     <button class="navitem" data-view="import"><span class="ic" style="color:#4a7fb5">⇩</span>Synchro</button>
+    <button class="navitem" data-view="devices"><span class="ic" style="color:#3f8f6e">▧</span>Appareils</button>
     <button class="navitem" data-view="settings"><span class="ic" style="color:var(--bad)">⚙</span>Tarifs</button>
     <div class="sidebar-extra">
       <div class="sys-card" id="sidebar-status">
@@ -266,6 +267,7 @@ const state = {
   clients: [],
   projects: [],
   usage: [],
+  devices: [],
   pricing: null,
   lastSync: null,
   agentLastSeen: null,
@@ -527,6 +529,7 @@ async function loadState() {
     state.clients = data.clients || [];
     state.projects = data.projects || [];
     state.usage = data.usage || [];
+    state.devices = data.devices || [];
     state.pricing = data.pricing || DEFAULT_PRICING;
     state.lastSync = data.lastSync || null;
     state.agentLastSeen = data.agentLastSeen || null;
@@ -595,6 +598,7 @@ function render() {
   else if (state.view === "clients") main.innerHTML = renderClients();
   else if (state.view === "projects") main.innerHTML = renderProjects();
   else if (state.view === "import") main.innerHTML = renderImport();
+  else if (state.view === "devices") main.innerHTML = renderDevices();
   else if (state.view === "settings") main.innerHTML = renderSettings();
   wireView();
 }
@@ -913,6 +917,53 @@ function renderProjects() {
   `;
 }
 
+/* ---- devices ---- */
+function deviceStatus(device) {
+  if (!device.lastSeen) return { seen: false, historic: true, label: "Historique" };
+  const secAgo = (Date.now() - new Date(device.lastSeen).getTime()) / 1000;
+  return secAgo < 150
+    ? { seen: true, secAgo, label: `Actif` }
+    : { seen: false, secAgo, label: `Hors ligne` };
+}
+
+function renderDevices() {
+  const rows = state.devices.slice().sort((a, b) => {
+    if (a.id === "legacy") return 1;
+    if (b.id === "legacy") return -1;
+    return new Date(b.lastSeen || 0) - new Date(a.lastSeen || 0);
+  });
+
+  const perDevice = rows.map(d => {
+    const entries = state.usage.filter(u => u.deviceId === d.id);
+    const tokens = entries.reduce((s, u) => s + totalTokens(u.totals || {}), 0);
+    const cost = entries.reduce((s, u) => s + costOf(u.model, u.totals || {}), 0);
+    return { ...d, tokens, cost };
+  });
+
+  return `
+    <div class="pagehead">
+      <div><h1>Appareils</h1><div class="desc">Chaque machine qui pousse de la conso s'enregistre automatiquement ici</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Enregistrer un nouvel appareil</h3></div>
+      <div class="card-body">
+        <p style="margin:0 0 10px;color:var(--ink-dim)">Sur la machine à ajouter, à la racine du projet :</p>
+        <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">./configure_sync.sh
+./install_autosync.sh</pre>
+        <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Un identifiant unique est généré au premier <code class="k">install_autosync.sh</code> et réutilisé ensuite — pas besoin de le créer ici.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      ${perDevice.length === 0 ? `<div class="empty"><div class="big">▧</div>Aucun appareil enregistré pour l'instant.</div>` : `
+      <table>
+        <thead><tr><th>Appareil</th><th>Statut</th><th>Dernier contact</th><th class="num">Tokens (total)</th><th class="num">Coût est.</th><th></th></tr></thead>
+        <tbody>
+          ${perDevice.map(d => {
+            const st = deviceStatus(d);
+            const dotColor = st.historic ? "var(--ink-faint)" : st.seen ? "var(--good)" : "var(--warn)";
+            return `<tr>
 function renderImport() {
   const sync = state.lastSync;
   const agent = agentStatus();
