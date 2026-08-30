@@ -43,9 +43,9 @@ DEVICE_QS=""
 
 do_sync() {
   local reason="$1"
-  local device_args=()
-  [ -n "$DEVICE_ID" ] && device_args=(--device-id "$DEVICE_ID" --device-name "$DEVICE_NAME")
-  PAYLOAD="$(python3 "$DIR/export_usage.py" --days 90 "${device_args[@]}" 2>>"$LOG_DIR/sync.log")"
+  if [ -n "$DEVICE_ID" ]; then
+    PAYLOAD="$(python3 "$DIR/export_usage.py" --days 90 --device-id "$DEVICE_ID" --device-name "$DEVICE_NAME" 2>>"$LOG_DIR/sync.log")"
+  else
   HTTP_CODE=$(curl -sS -o "$LOG_DIR/last_response.json" -w "%{http_code}" \
     -X POST "$BASE_URL/api/sync" \
     -H "Authorization: Bearer $LEDGER_API_KEY" \
