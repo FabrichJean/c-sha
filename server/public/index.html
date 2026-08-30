@@ -1468,6 +1468,14 @@ function wireView() {
       const device = state.devices.find(d => d.id === el.dataset.shareDevice);
       if (!device || !device.viewToken) { toast("Lien indisponible"); return; }
       const url = `${location.origin}/device.html?id=${encodeURIComponent(device.id)}&token=${encodeURIComponent(device.viewToken)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast("Lien copié dans le presse-papiers");
+      } catch (err) {
+        window.prompt("Copie ce lien :", url);
+      }
+    };
+  });
 
   const importManualBtn = document.getElementById("btn-import-manual");
   if (importManualBtn) importManualBtn.onclick = handleImportManual;
