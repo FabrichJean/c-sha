@@ -75,11 +75,65 @@ function upsertDevice(id, name, hostname) {
     db.prepare(`UPDATE devices SET last_seen = @now, hostname = COALESCE(@hostname, hostname), name = COALESCE(name, @name) WHERE id = @id`)
       .run({ id, now, hostname: hostname || null, name: name || id });
   } else {
-    db.prepare(`INSERT INTO devices (id, name, hostname, first_seen, last_seen) VALUES (@id, @name, @hostname, @now, @now)`)
-      .run({ id, name: name || id, hostname: hostname || null, now });
+    const viewToken = crypto.randomBytes(24).toString("hex");
+    db.prepare(`INSERT INTO devices (id, name, hostname, first_seen, last_seen, view_token) VALUES (@id, @name, @hostname, @now, @now, @viewToken)`)
+      .run({ id, name: name || id, hostname: hostname || null, now, viewToken });
   }
 }
 
+/* lien de partage : genere paresseusement pour les appareils crees avant cette fonctionnalite */
+function ensureViewToken(id) {
+  const row = db.prepare("SELECT view_token FROM devices WHERE id = ?").get(id);
+  if (!row) return null;
+  if (row.view_token) return row.view_token;
+  const viewToken = crypto.randomBytes(24).toString("hex");
+  db.prepare("UPDATE devices SET view_token = ? WHERE id = ?").run(viewToken, id);
+  return viewToken;
+}
+
+/* ---------------- pricing (partage entre l'ingestion, l'API et la vue appareil restreinte) ---------------- */
+const DEFAULT_PRICING_SERVER = {
+  models: {
+    "claude-fable-5":   { in: 10, out: 50, cacheWrite: 12.5, cacheRead: 1 },
+    "claude-mythos-5":  { in: 10, out: 50, cacheWrite: 12.5, cacheRead: 1 },
+    "claude-opus-5":    { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-opus-4-8":  { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-opus-4-7":  { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-opus-4-6":  { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-sonnet-5":  { in: 2,  out: 10, cacheWrite: 2.5,  cacheRead: 0.2 },
+    "claude-sonnet-4-6":{ in: 3,  out: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+    "claude-haiku-4-5": { in: 1,  out: 5,  cacheWrite: 1.25, cacheRead: 0.1 },
+  },
+  fallback: { in: 3, out: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+};
+function getPricing() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'pricing'").get();
+  return row ? JSON.parse(row.value) : DEFAULT_PRICING_SERVER;
+}
+function costOfServer(model, totals, pricing) {
+  const p = pricing.models[model] || pricing.fallback || DEFAULT_PRICING_SERVER.fallback;
+  const t = totals || {};
+  return (t.input || 0) * p.in / 1e6 + (t.output || 0) * p.out / 1e6 +
+         (t.cacheCreate || 0) * p.cacheWrite / 1e6 + (t.cacheRead || 0) * p.cacheRead / 1e6;
+}
+
+/* ---------------- KPI compacts pour la vue appareil restreinte (lien de partage) ---------------- */
+function computeDeviceKpis(deviceId) {
+  const pricing = getPricing();
+  const rows = db.prepare("SELECT model, daily FROM usage_entries WHERE device_id = ?").all(deviceId);
+  const daily = []; // {date, model, input, output, cacheCreate, cacheRead}
+  for (const r of rows) {
+    const d = JSON.parse(r.daily || "{}");
+    for (const [date, t] of Object.entries(d)) daily.push({ date, model: r.model, ...t });
+  }
+  const totalTok = t => (t.input || 0) + (t.output || 0) + (t.cacheCreate || 0) + (t.cacheRead || 0);
+  const cacheTok = t => (t.cacheCreate || 0) + (t.cacheRead || 0);
+
+  const now = new Date();
+  const dateStr = offset => { const d = new Date(now); d.setDate(d.getDate() - offset); return d.toISOString().slice(0, 10); };
+  const today = dateStr(0), yesterday = dateStr(1);
+
+  const byDay = (days, reducer) => {
 /* ---------------- sync ingestion (shared by script push + manual browser import) ---------------- */
 function ingestUsagePayload(payload) {
   if (!payload || !Array.isArray(payload.projects)) {
