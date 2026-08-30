@@ -1491,9 +1491,14 @@ function renderDevices() {
 function deviceModal(device) {
   const clientOptions = state.clients.map(c => `<option value="${c.id}" ${device.clientId === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
   openModal(`
-    <div class="mh">Renommer l'appareil</div>
+    <div class="mh">Modifier l'appareil</div>
     <div class="mb">
       <div class="field"><label>Nom</label><input id="m-name" value="${escapeHtml(device.name)}" placeholder="MacBook Pro de Marc"></div>
+      <div class="field">
+        <label>Client</label>
+        <select id="m-device-client"><option value="">— aucun —</option>${clientOptions}</select>
+        <div class="hint" style="color:var(--ink-faint);font-size:11.5px;margin-top:4px">Un appareil lié à un client s'ajoute automatiquement lors de la création d'une facture pour ce client.</div>
+      </div>
     </div>
     <div class="mf"><button class="btn ghost" id="m-cancel">Annuler</button><button class="btn primary" id="m-save">Enregistrer</button></div>
   `);
@@ -1501,10 +1506,11 @@ function deviceModal(device) {
   document.getElementById("m-save").onclick = async () => {
     const name = document.getElementById("m-name").value.trim();
     if (!name) { toast("Le nom est requis"); return; }
+    const clientId = document.getElementById("m-device-client").value || null;
     try {
-      await api("/api/devices/" + device.id, { method: "PUT", body: JSON.stringify({ name }) });
+      await api("/api/devices/" + device.id, { method: "PUT", body: JSON.stringify({ name, clientId }) });
       closeModal();
-      toast("Appareil renommé");
+      toast("Appareil enregistré");
       await loadState();
     } catch (e) { toast("Erreur : " + e.message); }
   };
