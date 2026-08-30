@@ -747,6 +747,50 @@ function buildDetailTableCard(projectEntries, in30) {
           <tbody>
             ${projectEntries.map(([pkey, t]) => {
               const proj = projectForKey(pkey);
+              const client = clientForProject(proj);
+              const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
+              return `<tr>
+                <td>${escapeHtml(proj ? proj.name : pkey)}${!proj ? ` <span class="hint" style="color:var(--warn)">· non lié</span>` : ""}</td>
+                <td>${escapeHtml(client ? client.name : "—")}</td>
+                <td class="num mono">${fmtNum(t.input)}</td>
+                <td class="num mono">${fmtNum(t.output)}</td>
+                <td class="num mono">${fmtNum(t.cacheCreate + t.cacheRead)}</td>
+                <td class="num mono">${fmtNum(totalTokens(t))}</td>
+                <td class="num mono">${fmtUsd(cost)}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderDashboard() {
+  const rows = allDailyRows();
+  if (rows.length === 0) {
+    return `
+      <div class="pagehead"><div><h1>Tableau de bord</h1><div class="desc">Vue d'ensemble de ta consommation de tokens Claude Code</div></div></div>
+      ${refreshProgressBanner()}
+      <div class="card"><div class="empty">
+        <div class="big">◧</div>
+        <div><strong>Aucune donnée pour l'instant.</strong></div>
+        <div style="margin-top:6px">La synchro automatique alimentera cette page dès son premier envoi.</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:16px">
+          <button class="btn primary" id="btn-refresh" ${state.refreshing ? "disabled" : ""}>${state.refreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir maintenant"}</button>
+          <button class="btn" data-nav="import">Voir le statut de synchro</button>
+        </div>
+      </div></div>`;
+  }
+
+  const now = new Date();
+  const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+  const in30 = rows.filter(r => r.date >= d30.toISOString().slice(0, 10));
+  const byProject = aggregate(in30, r => r.projectKey);
+  const projectEntries = [...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
+  const rowsToday = rows.filter(r => r.date === now.toISOString().slice(0, 10));
+  const modelsToday = [...aggregate(rowsToday, r => r.model).entries()].filter(([, t]) => totalTokens(t) > 0).sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
+
+  /* ---- agent / synchro / activite (concepts globaux, pas par appareil) ---- */
   const agentSeen = agentStatus().seen;
   const agentCard = `
     <div class="card deco-card" style="margin-bottom:0;padding:16px">
@@ -798,11 +842,11 @@ function buildDetailTableCard(projectEntries, in30) {
 
     ${refreshProgressBanner()}
 
-    ${kpiHtml}
+    ${buildKpiSection(rows)}
 
     <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:14px;align-items:start;margin-bottom:20px">
-      ${trendCard}
-      ${donutCard}
+      ${buildTrendCard(rows)}
+      ${buildDonutCard(projectEntries)}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:14px;align-items:stretch;margin-bottom:24px">
@@ -811,13 +855,13 @@ function buildDetailTableCard(projectEntries, in30) {
       ${activityCard}
     </div>
 
-    <div class="card" id="detail-table">
-      <div class="card-head"><h3>Détail par projet</h3><span class="hint">30 derniers jours, coût estimé</span></div>
-      <div class="card-body" style="padding:0">
-        <table>
-          <thead><tr><th>Projet</th><th>Client</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th><th class="num">Coût est.</th></tr></thead>
-          <tbody>
-            ${projectEntries.map(([pkey, t]) => {
+    ${buildDetailTableCard(projectEntries, in30)}
+  `;
+}
+
+/* ---- vue detaillee d'un appareil ---- */
+function renderDeviceDetail() {
+  const device = state.devices.find(d => d.id === state.selectedDeviceId);
               const proj = projectForKey(pkey);
               const client = clientForProject(proj);
               const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
