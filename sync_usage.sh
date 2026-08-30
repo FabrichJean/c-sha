@@ -46,6 +46,8 @@ do_sync() {
   if [ -n "$DEVICE_ID" ]; then
     PAYLOAD="$(python3 "$DIR/export_usage.py" --days 90 --device-id "$DEVICE_ID" --device-name "$DEVICE_NAME" 2>>"$LOG_DIR/sync.log")"
   else
+    PAYLOAD="$(python3 "$DIR/export_usage.py" --days 90 2>>"$LOG_DIR/sync.log")"
+  fi
   HTTP_CODE=$(curl -sS -o "$LOG_DIR/last_response.json" -w "%{http_code}" \
     -X POST "$BASE_URL/api/sync" \
     -H "Authorization: Bearer $LEDGER_API_KEY" \
