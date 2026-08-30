@@ -883,7 +883,7 @@ function renderDeviceDetail() {
       </div>
       <div style="display:flex;gap:8px">
         ${device.id !== "legacy" ? `<button class="btn" id="btn-refresh-device" data-refresh-device="${device.id}" ${state.deviceRefreshing ? "disabled" : ""}>${state.deviceRefreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir"}</button>` : ""}
-        ${device.id !== "legacy" ? `<button class="btn" data-share-device="${device.id}">⇗ Lien de partage</button>` : ""}
+        ${device.id !== "legacy" ? `<button class="btn" data-share-device="${device.id}">↗ Lien de partage</button>` : ""}
         ${device.id !== "legacy" ? `<button class="btn" data-rename-device="${device.id}">Renommer</button>` : ""}
       </div>
     </div>
