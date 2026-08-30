@@ -1899,33 +1899,6 @@ function docsUninstallCommand(os, pythonMode) {
 }
 
 function renderImport() {
-  const sync = state.lastSync;
-  const agent = agentStatus();
-  const agentCard = `
-    <div class="card">
-      <div class="card-head"><h3>Agent local</h3><span class="hint">processus persistant, connexion en temps quasi réel</span></div>
-      <div class="card-body" style="display:flex;align-items:center;gap:10px">
-        <span class="dot" style="width:9px;height:9px;border-radius:50%;display:inline-block;background:${agent.seen ? "var(--good)" : "var(--warn)"}"></span>
-        <div>
-          <div><strong>${agent.seen ? "Actif" : "Non détecté"}</strong></div>
-          <div class="hint" style="color:var(--ink-dim)">${state.agentLastSeen ? `Dernier contact : ${new Date(state.agentLastSeen).toLocaleString("fr-FR")}` : "Aucun contact enregistré depuis le démarrage du serveur"}</div>
-        </div>
-      </div>
-      ${!agent.seen ? `<div class="card-body" style="padding-top:0;color:var(--ink-dim);font-size:12.5px">Pas encore installé sur cette machine ? Suis les instructions ci-dessous.</div>` : ""}
-    </div>`;
-  const statusCard = sync ? `
-    <div class="card">
-      <div class="card-head"><h3>Dernière synchro reçue</h3></div>
-      <div class="card-body">
-        <div style="display:flex;gap:26px;flex-wrap:wrap">
-          <div><div class="hint" style="color:var(--ink-faint)">Reçue le</div><div class="mono" style="font-size:15px">${new Date(sync.at).toLocaleString("fr-FR")}</div></div>
-          <div><div class="hint" style="color:var(--ink-faint)">Enregistrements</div><div class="mono" style="font-size:15px">${sync.written}</div></div>
-          <div><div class="hint" style="color:var(--ink-faint)">Messages sources</div><div class="mono" style="font-size:15px">${sync.messageCount ?? "—"}</div></div>
-        </div>
-      </div>
-    </div>` : `
-    <div class="card"><div class="empty"><div class="big">⇩</div>Aucune synchro reçue pour l'instant.</div></div>`;
-
   const osLabels = { windows: "Windows", macos: "macOS", linux: "Linux" };
   const osTabs = `<div class="tabs">${Object.keys(osLabels).map(k => `<button data-docs-os="${k}" class="${state.docsOS === k ? "active" : ""}">${osLabels[k]}</button>`).join("")}</div>`;
   const modeTabs = `<div class="tabs">
@@ -1935,9 +1908,6 @@ function renderImport() {
 
   return `
     <div class="pagehead"><div><h1>Docs</h1><div class="desc">Installation de l'agent local, synchro automatique et utilisation du CRM</div></div></div>
-
-    ${agentCard}
-    ${statusCard}
 
     <div class="card">
       <div class="card-head"><h3>Comment ça marche</h3></div>
@@ -1971,23 +1941,12 @@ function renderImport() {
     <div class="card">
       <div class="card-head"><h3>Vérifier que ça marche</h3></div>
       <div class="card-body" style="color:var(--ink-dim)">
-        <p style="margin:0 0 10px">Reviens sur cette page quelques secondes après l'installation : la carte "Agent local" en haut doit passer à <strong>Actif</strong>. Si ce n'est pas le cas :</p>
+        <p style="margin:0 0 10px">Reviens sur cette page quelques secondes après l'installation : le badge "Agent local" en bas de la barre latérale doit passer à <strong>Actif</strong>. Si ce n'est pas le cas :</p>
         <ul style="margin:0;padding-left:18px;line-height:1.9">
           <li>Vérifie les logs sur la machine : <code class="k">~/.ledger/logs/sync.log</code> (<code class="k">%USERPROFILE%\\.ledger\\logs\\sync.log</code> sur Windows).</li>
           <li>Vérifie que l'URL du serveur est bien accessible depuis cette machine (essaie de l'ouvrir dans un navigateur).</li>
           <li>Vérifie que la clé API collée est bien complète, sans espace ni retour à la ligne en trop.</li>
         </ul>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h3>Import manuel</h3><span class="hint">secours, si la synchro auto est indisponible</span></div>
-      <div class="card-body">
-        <div class="field"><textarea id="import-json" placeholder='{"exportedAt":"...","projects":[...]}'></textarea></div>
-        <div style="display:flex;gap:10px;align-items:center">
-          <button class="btn" id="btn-import-manual">Importer ce texte</button>
-          <span class="hint" id="import-status" style="color:var(--ink-faint);font-size:12.5px"></span>
-        </div>
       </div>
     </div>
   `;
@@ -2262,25 +2221,6 @@ async function handleDeviceRefreshClick(deviceId) {
     : "Cet appareil ne répond pas — vérifie que son agent tourne toujours");
 }
 
-/* ---------------- manual import fallback ---------------- */
-async function handleImportManual() {
-  const raw = document.getElementById("import-json").value.trim();
-  const statusEl = document.getElementById("import-status");
-  if (!raw) { statusEl.textContent = "Colle d'abord le JSON exporté."; return; }
-  let parsed;
-  try { parsed = JSON.parse(raw); } catch (e) { statusEl.textContent = "JSON invalide : " + e.message; return; }
-  try {
-    statusEl.textContent = "Import en cours…";
-    const result = await api("/api/import", { method: "POST", body: JSON.stringify(parsed) });
-    statusEl.textContent = `Importé : ${result.written} enregistrement(s).`;
-    toast("Import terminé");
-    document.getElementById("import-json").value = "";
-    await loadState();
-  } catch (e) {
-    statusEl.textContent = "Erreur : " + e.message;
-  }
-}
-
 /* ---------------- wiring ---------------- */
 function wireView() {
   document.querySelectorAll("[data-nav]").forEach(el => { el.onclick = () => { state.view = el.dataset.nav; render(); }; });
@@ -2455,9 +2395,6 @@ function wireView() {
       }
     };
   });
-
-  const importManualBtn = document.getElementById("btn-import-manual");
-  if (importManualBtn) importManualBtn.onclick = handleImportManual;
 
   const savePricingBtn = document.getElementById("btn-save-pricing");
   if (savePricingBtn) savePricingBtn.onclick = async () => {
