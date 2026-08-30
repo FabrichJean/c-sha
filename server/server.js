@@ -119,7 +119,7 @@ function ingestUsagePayload(payload) {
   tx();
   db.prepare(`INSERT INTO settings (key, value) VALUES ('last_sync', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
     .run({ v: JSON.stringify({ at: now, written, messageCount: payload.messageCount || null, deviceId }) });
-  return { written, messageCount: payload.messageCount || null };
+  return { written, messageCount: payload.messageCount || null, deviceId };
 }
 
 /* sync endpoint used by sync_usage.sh (cle API, pas de session navigateur) */
@@ -127,6 +127,7 @@ app.post("/api/sync", requireApiKey, (req, res) => {
   try {
     const result = ingestUsagePayload(req.body);
     clearSyncRequest();
+    clearDeviceSyncRequest(result.deviceId);
     res.json({ ok: true, ...result });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
@@ -142,7 +143,9 @@ app.get("/api/sync-status", requireApiKey, (req, res) => {
     .run({ v: JSON.stringify(now) });
   const deviceId = req.query.deviceId;
   if (deviceId) upsertDevice(deviceId, req.query.deviceName, req.query.deviceName);
-  res.json({ requested: !!getSyncRequest(), requestedAt: getSyncRequest() });
+  const globalReq = getSyncRequest();
+  const deviceReq = deviceId ? getDeviceSyncRequest(deviceId) : null;
+  res.json({ requested: !!globalReq || !!deviceReq, requestedAt: deviceReq || globalReq });
 });
 
 function getSyncRequest() {
@@ -153,6 +156,19 @@ function clearSyncRequest() {
   db.prepare("DELETE FROM settings WHERE key = 'sync_requested'").run();
 }
 
+/* demandes de synchro ciblees sur un seul appareil (bouton "Rafraichir" d'une page device) */
+function getAllDeviceSyncRequests() {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'device_sync_requested'").get();
+  return row ? JSON.parse(row.value) : {};
+}
+function getDeviceSyncRequest(deviceId) {
+  return getAllDeviceSyncRequests()[deviceId] || null;
+}
+function setDeviceSyncRequest(deviceId) {
+  const all = getAllDeviceSyncRequests();
+  all[deviceId] = new Date().toISOString();
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('device_sync_requested', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
+    .run({ v: JSON.stringify(all) });
 /* ---------------- everything else behind basic auth ---------------- */
 app.use(requireBasicAuth);
 
