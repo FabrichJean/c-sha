@@ -327,7 +327,8 @@ app.get("/api/state", (req, res) => {
 app.put("/api/devices/:id", (req, res) => {
   const { name, clientId } = req.body;
   if (!name) return res.status(400).json({ error: "Le nom est requis." });
-  const info = db.prepare("UPDATE devices SET name = ? WHERE id = ?").run(name, req.params.id);
+  const info = db.prepare("UPDATE devices SET name = @name, client_id = @clientId WHERE id = @id")
+    .run({ id: req.params.id, name, clientId: clientId || null });
   if (info.changes === 0) return res.status(404).json({ error: "Appareil introuvable." });
   res.json({ ok: true });
 });
