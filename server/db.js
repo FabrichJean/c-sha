@@ -41,6 +41,10 @@ db.exec(`
     line_items TEXT NOT NULL DEFAULT '[]',
     notes TEXT,
     created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS usage_entries (
     id TEXT PRIMARY KEY,
     project_key TEXT NOT NULL,
@@ -75,6 +79,12 @@ if (!usageCols.includes("device_id")) {
 const deviceCols = db.prepare("PRAGMA table_info(devices)").all().map(c => c.name);
 if (!deviceCols.includes("view_token")) {
   db.exec("ALTER TABLE devices ADD COLUMN view_token TEXT");
+}
+
+/* migration: projects predates the billing-mode feature */
+const projectCols = db.prepare("PRAGMA table_info(projects)").all().map(c => c.name);
+if (!projectCols.includes("billing_mode")) {
+  db.exec("ALTER TABLE projects ADD COLUMN billing_mode TEXT NOT NULL DEFAULT 'tokens'");
 }
 
 function uid() {
