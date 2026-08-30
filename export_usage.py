@@ -10,6 +10,7 @@ Usage:
     python3 export_usage.py --days 30        # limite aux N derniers jours
 """
 from __future__ import annotations
+
 import json
 import sys
 import argparse

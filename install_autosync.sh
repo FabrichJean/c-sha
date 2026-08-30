@@ -18,6 +18,8 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AGENT_DIR="$HOME/Library/Application Support/Ledger/agent"
 mkdir -p "$AGENT_DIR"
 cp "$DIR/export_usage.py" "$DIR/sync_usage.sh" "$AGENT_DIR/"
+chmod +x "$AGENT_DIR/sync_usage.sh"
+
 PLIST_LABEL="com.mdledger.tokensync"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_LABEL.plist"
 
@@ -33,7 +35,7 @@ cat > "$PLIST_PATH" <<EOF
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
-    <string>$DIR/sync_usage.sh</string>
+    <string>$AGENT_DIR/sync_usage.sh</string>
   </array>
   <key>StartInterval</key>
   <integer>60</integer>
@@ -51,7 +53,16 @@ mkdir -p "$HOME/Library/Logs/ledger-autosync"
 launchctl unload "$PLIST_PATH" >/dev/null 2>&1 || true
 launchctl load "$PLIST_PATH"
 
+sleep 2
+STATUS_LINE="$(launchctl list | grep "$PLIST_LABEL" || true)"
+LAST_EXIT="$(echo "$STATUS_LINE" | awk '{print $2}')"
+
 echo "Synchro automatique installee : $PLIST_LABEL"
+echo "Fichiers de l'agent : $AGENT_DIR"
 echo "Check toutes les 60s ; push reel toutes les 4h ou sur demande depuis le CRM."
 echo "Logs : ~/Library/Logs/ledger-autosync/"
+if [ "$LAST_EXIT" != "0" ] && [ -n "$LAST_EXIT" ]; then
+  echo ""
+  echo "ATTENTION : code de sortie $LAST_EXIT au demarrage — verifie ~/Library/Logs/ledger-autosync/launchd.err.log"
+fi
 echo "Pour desinstaller : ./uninstall_autosync.sh"
