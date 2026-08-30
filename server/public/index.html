@@ -104,41 +104,7 @@
   .btn:disabled { opacity: .45; cursor: default; }
   .btn.sm { padding: 5px 10px; font-size: 12px; }
 
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 28px; }
-  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); }
-  .tile .label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 600; }
-  .tile .value { font-size: 25px; font-weight: 650; margin-top: 6px; font-family: "IBM Plex Mono", monospace; }
-  .tile .sub { font-size: 12px; color: var(--ink-dim); margin-top: 3px; }
-  .tile .value.accent { color: var(--accent); }
-  .tile .value.violet { color: var(--violet); }
-
-  /* ---- widget cards ---- */
-  .widget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px; }
-  .widget { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 16px 16px 4px; display: flex; flex-direction: column; }
-  .widget-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
-  .widget-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #fff; flex-shrink: 0; }
-  .widget-badge { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 650; font-family: "IBM Plex Mono", monospace; }
-  .widget-badge.up { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
-  .widget-badge.down { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
-  .widget-badge.flat { background: var(--surface-2); color: var(--ink-faint); }
-  .widget-title { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); font-weight: 700; margin-bottom: 12px; }
-  .widget-periods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--bg); border-radius: 10px; padding: 12px 4px; margin-bottom: 4px; }
-  .widget-periods .p { text-align: center; padding: 0 4px; }
-  .widget-periods .p + .p { border-left: 1px solid var(--border); }
-  .widget-periods .p-label { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .04em; }
-  .widget-periods .p-value { font-size: 18px; font-weight: 650; font-family: "IBM Plex Mono", monospace; margin-top: 4px; font-variant-numeric: tabular-nums; }
-  .widget-periods .p-sub { font-size: 10.5px; margin-top: 2px; font-family: "IBM Plex Mono", monospace; color: var(--ink-faint); }
-  .widget-breakdown { display: flex; flex-direction: column; }
-  .widget-row { display: flex; align-items: center; gap: 10px; padding: 11px 4px; border-top: 1px solid var(--border); }
-  .widget-row .w-dot { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
-  .widget-row .w-label { font-size: 12.5px; color: var(--ink-dim); flex: 1; }
-  .widget-row .w-value { font-size: 13px; font-weight: 620; font-family: "IBM Plex Mono", monospace; text-align: right; }
-  .widget-row .w-sub { font-size: 10.5px; color: var(--ink-faint); text-align: right; font-family: "IBM Plex Mono", monospace; margin-top: 1px; }
-  .widget-empty-row { padding: 14px 4px; border-top: 1px solid var(--border); font-size: 12px; color: var(--ink-faint); text-align: center; }
-  .widget.stat { justify-content: space-between; min-height: 168px; }
-  .widget.stat .stat-desc { font-size: 12px; color: var(--ink-dim); margin-top: 2px; line-height: 1.4; }
-  .widget.stat .stat-big { font-size: 34px; font-weight: 700; font-family: "IBM Plex Mono", monospace; margin: 14px 0 6px; }
-  .widget.stat .stat-foot { font-size: 12px; color: var(--ink-faint); padding-bottom: 14px; }
+  /* ---- inline status pill (agent live indicator) ---- */
   .widget-live { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 650; padding: 3px 9px; border-radius: 999px; }
   .widget-live.on { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
   .widget-live.off { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
@@ -189,6 +155,81 @@
   code.k { background: var(--surface-2); padding: 1px 6px; border-radius: 5px; font-family: "IBM Plex Mono", monospace; font-size: 12px; }
   .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--ink-dim); }
   .legend .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+
+  /* ---- sidebar extras: system card + user chip ---- */
+  .sidebar-extra { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .sys-card { display: flex; align-items: flex-start; gap: 9px; padding: 10px 11px; border-radius: 10px; background: var(--surface-2); }
+  .sys-card .sys-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; background: var(--ink-faint); }
+  .sys-card .sys-dot.ok { background: var(--good); }
+  .sys-card .sys-dot.stale { background: var(--warn); }
+  .sys-card .sys-title { font-size: 12.5px; font-weight: 620; }
+  .sys-card .sys-sub { font-size: 11px; color: var(--ink-faint); margin-top: 1px; line-height: 1.35; }
+  .user-chip { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 10px; cursor: default; }
+  .user-chip .avatar { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg,var(--accent),var(--violet)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+  .user-chip .u-name { font-size: 12.5px; font-weight: 620; }
+  .user-chip .u-role { font-size: 11px; color: var(--ink-faint); }
+  .user-chip .chev { margin-left: auto; color: var(--ink-faint); font-size: 11px; }
+
+  /* ---- KPI cards (widget concept v2) ---- */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 16px; }
+  .kpi-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .kpi-id { display: flex; align-items: center; gap: 9px; }
+  .kpi-icon { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; color: #fff; flex-shrink: 0; }
+  .kpi-title { font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 700; }
+  .kpi-pct { font-size: 12px; font-weight: 650; font-family: "IBM Plex Mono", monospace; display: inline-flex; align-items: center; gap: 2px; }
+  .kpi-pct.up { color: var(--good); }
+  .kpi-pct.down { color: var(--bad); }
+  .kpi-pct.flat { color: var(--ink-faint); }
+  .kpi-big { font-size: 27px; font-weight: 700; font-family: "IBM Plex Mono", monospace; margin-bottom: 12px; }
+  .kpi-periods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-bottom: 10px; }
+  .kpi-periods .kp-label { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .03em; }
+  .kpi-periods .kp-value { font-size: 13px; font-weight: 620; font-family: "IBM Plex Mono", monospace; margin-top: 3px; }
+  .kpi-spark { display: block; width: 100%; height: 34px; }
+
+  /* ---- trend chart card ---- */
+  .trend-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .trend-head-title { display: flex; align-items: center; gap: 10px; }
+  .trend-head-title .th-icon { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg,#4a7fb5,#345f8c); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .trend-controls { display: flex; align-items: center; gap: 8px; }
+  .tabs { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 3px; gap: 2px; }
+  .tabs button { border: none; background: none; padding: 5px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-dim); cursor: pointer; }
+  .tabs button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+  .period-select { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; color: var(--ink); font-family: inherit; }
+  .trend-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .trend-note { font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+  .trend-note.up { color: var(--good); }
+  .trend-note.down { color: var(--bad); }
+  .link-arrow { font-size: 12.5px; font-weight: 620; color: var(--accent); cursor: pointer; white-space: nowrap; background: none; border: none; font-family: inherit; }
+  .link-arrow:hover { text-decoration: underline; }
+
+  /* ---- donut + legend table ---- */
+  .donut-row { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+  .donut-center-label { text-align: center; }
+  .donut-center-label .dc-total { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .04em; }
+  .donut-center-label .dc-value { font-size: 16px; font-weight: 700; font-family: "IBM Plex Mono", monospace; margin-top: 2px; }
+  .donut-center-label .dc-unit { font-size: 10.5px; color: var(--ink-faint); }
+  .legend-table { flex: 1; min-width: 200px; }
+  .legend-table .lt-head { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-faint); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .legend-table .lt-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .legend-table .lt-row:last-child { border-bottom: none; }
+  .legend-table .lt-name { display: flex; align-items: center; gap: 7px; }
+  .legend-table .lt-name .lt-dot { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
+  .legend-table .lt-value { font-family: "IBM Plex Mono", monospace; font-weight: 620; text-align: right; }
+  .legend-table .lt-pct { color: var(--ink-faint); font-family: "IBM Plex Mono", monospace; text-align: right; }
+
+  /* ---- decorative stat cards (agent / last sync) ---- */
+  .deco-card { position: relative; overflow: hidden; }
+  .deco-icon { position: absolute; right: -8px; bottom: -10px; font-size: 76px; opacity: .06; line-height: 1; pointer-events: none; }
+  .deco-check { position: absolute; top: 14px; right: 14px; width: 20px; height: 20px; border-radius: 50%; background: var(--good); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+
+  /* ---- activity feed ---- */
+  .activity-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); }
+  .activity-row:first-child { border-top: none; padding-top: 2px; }
+  .activity-row .a-dot { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
+  .activity-row .a-label { font-size: 12.5px; color: var(--ink-dim); flex: 1; }
+  .activity-row .a-value { font-size: 12.5px; font-weight: 620; font-family: "IBM Plex Mono", monospace; text-align: right; }
+  .activity-row .a-time { font-size: 11px; color: var(--ink-faint); text-align: right; white-space: nowrap; margin-left: 10px; min-width: 72px; }
 </style>
 </head>
 <body>
@@ -196,12 +237,22 @@
   <nav class="sidebar">
     <div class="brand"><span class="mark"></span><span class="name">Ledger</span></div>
     <div style="padding:0 10px 14px"><span class="brand sub" style="padding:0">Conso Claude Code</span></div>
-    <button class="navitem active" data-view="dashboard"><span class="ic">◧</span>Tableau de bord</button>
-    <button class="navitem" data-view="clients"><span class="ic">◔</span>Clients</button>
-    <button class="navitem" data-view="projects"><span class="ic">◇</span>Projets</button>
-    <button class="navitem" data-view="import"><span class="ic">⇩</span>Synchro</button>
-    <button class="navitem" data-view="settings"><span class="ic">⚙</span>Tarifs</button>
-    <div class="sidebar-foot" id="sidebar-status">Connexion…</div>
+    <button class="navitem active" data-view="dashboard"><span class="ic" style="color:var(--accent)">◧</span>Tableau de bord</button>
+    <button class="navitem" data-view="clients"><span class="ic" style="color:var(--violet)">◔</span>Clients</button>
+    <button class="navitem" data-view="projects"><span class="ic" style="color:#c9622a">◇</span>Projets</button>
+    <button class="navitem" data-view="import"><span class="ic" style="color:#4a7fb5">⇩</span>Synchro</button>
+    <button class="navitem" data-view="settings"><span class="ic" style="color:var(--bad)">⚙</span>Tarifs</button>
+    <div class="sidebar-extra">
+      <div class="sys-card" id="sidebar-status">
+        <span class="sys-dot"></span>
+        <div><div class="sys-title">Connexion…</div></div>
+      </div>
+      <div class="user-chip">
+        <span class="avatar">AD</span>
+        <div><div class="u-name">Admin</div><div class="u-role">Compte administrateur</div></div>
+        <span class="chev">⌄</span>
+      </div>
+    </div>
   </nav>
   <main id="main"></main>
 </div>
@@ -222,6 +273,8 @@ const state = {
   refreshing: false,
   refreshStartedAt: null,
   refreshAttempts: 0,
+  trendMetric: "tokens",
+  trendPeriod: 7,
 };
 
 const DEFAULT_PRICING = {
@@ -269,22 +322,48 @@ function pctChange(today, yesterday) {
   if (!yesterday) return today > 0 ? 100 : 0;
   return ((today - yesterday) / yesterday) * 100;
 }
-
-/* ---------------- widget cards (style "SaaS analytics") ---------------- */
-function widgetBadge(pct) {
-  if (pct === null || pct === undefined) return "";
-  const cls = pct > 0.5 ? "up" : pct < -0.5 ? "down" : "flat";
-  const arrow = pct > 0.5 ? "↑" : pct < -0.5 ? "↓" : "→";
-  return `<span class="widget-badge ${cls}">${arrow} ${Math.abs(pct).toFixed(0)}%</span>`;
+function timeAgo(iso) {
+  if (!iso) return "";
+  const sec = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (sec < 60) return `il y a ${sec}s`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `il y a ${h} h`;
+  return `il y a ${Math.round(h / 24)} j`;
 }
 
-function widget({ icon, iconBg, badgePct, title, periods, breakdown, breakdownEmptyLabel }) {
-  const periodsHtml = periods.map(p => `
-    <div class="p">
-      <div class="p-label">${escapeHtml(p.label)}</div>
-      <div class="p-value">${p.value}</div>
-      ${p.sub !== undefined ? `<div class="p-sub">${p.sub}</div>` : ""}
-    </div>`).join("");
+/* per-day series over the last `days` days ending today, using `reducer(dayRows) -> number` */
+function dailySeries(rows, days, reducer) {
+  const byDate = new Map();
+  for (const r of rows) {
+    if (!byDate.has(r.date)) byDate.set(r.date, []);
+    byDate.get(r.date).push(r);
+  }
+  const now = new Date();
+  const dates = [];
+  for (let i = days - 1; i >= 0; i--) { const dt = new Date(now); dt.setDate(dt.getDate() - i); dates.push(dt.toISOString().slice(0, 10)); }
+  return { dates, values: dates.map(d => reducer(byDate.get(d) || [])) };
+}
+
+function sparklineSvg(values, color) {
+  const w = 240, h = 34, pad = 3;
+  const max = Math.max(1, ...values);
+  const min = Math.min(0, ...values);
+  const range = Math.max(1, max - min);
+  const stepX = values.length > 1 ? (w - pad * 2) / (values.length - 1) : 0;
+  const pts = values.map((v, i) => {
+    const x = pad + i * stepX;
+    const y = pad + (h - pad * 2) * (1 - (v - min) / range);
+    return [x, y];
+  });
+  const line = pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const area = `${line} L${pts[pts.length - 1][0].toFixed(1)},${h - pad} L${pts[0][0].toFixed(1)},${h - pad} Z`;
+  const last = pts[pts.length - 1];
+  return `<svg class="kpi-spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <path d="${area}" fill="${color}" opacity="0.12" stroke="none"></path>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.6" fill="${color}"></circle>
 
   const rowsHtml = (breakdown && breakdown.length)
     ? breakdown.map(b => `
