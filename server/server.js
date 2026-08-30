@@ -126,6 +126,9 @@ function getSyncRequest() {
   return row ? JSON.parse(row.value) : null;
 }
 function clearSyncRequest() {
+  db.prepare("DELETE FROM settings WHERE key = 'sync_requested'").run();
+}
+
 /* ---------------- everything else behind basic auth ---------------- */
 app.use(requireBasicAuth);
 
@@ -150,6 +153,14 @@ app.get("/api/state", (req, res) => {
   const lastSync = lastSyncRow ? JSON.parse(lastSyncRow.value) : null;
 
   res.json({ clients, projects, usage, pricing, lastSync });
+});
+
+/* le bouton "Rafraichir" du CRM appelle ceci pour demander une synchro immediate */
+app.post("/api/request-sync", (req, res) => {
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('sync_requested', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
+    .run({ v: JSON.stringify(now) });
+  res.json({ ok: true, requestedAt: now });
 });
 
 /* import manuel depuis le navigateur (secours si le push automatique est indisponible) */

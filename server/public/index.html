@@ -715,6 +715,28 @@ async function handleRefreshClick() {
   const deadline = Date.now() + 3 * 60 * 1000; // 3 min max
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 5000));
+    try {
+      const data = await api("/api/state");
+      const newSyncAt = data.lastSync ? data.lastSync.at : null;
+      if (newSyncAt && newSyncAt !== previousSyncAt) {
+        state.clients = data.clients || [];
+        state.projects = data.projects || [];
+        state.usage = data.usage || [];
+        state.pricing = data.pricing || DEFAULT_PRICING;
+        state.lastSync = data.lastSync || null;
+        state.refreshing = false;
+        updateSidebarStatus();
+        render();
+        toast("Données à jour");
+        return;
+      }
+    } catch (e) { /* on reessaiera au prochain tick */ }
+  }
+  state.refreshing = false;
+  render();
+  toast("Toujours en attente — la machine locale est peut-être éteinte ou hors ligne");
+}
+
 /* ---------------- manual import fallback ---------------- */
 async function handleImportManual() {
   const raw = document.getElementById("import-json").value.trim();
@@ -737,6 +759,9 @@ async function handleImportManual() {
 /* ---------------- wiring ---------------- */
 function wireView() {
   document.querySelectorAll("[data-nav]").forEach(el => { el.onclick = () => { state.view = el.dataset.nav; render(); }; });
+
+  const refreshBtn = document.getElementById("btn-refresh");
+  if (refreshBtn) refreshBtn.onclick = handleRefreshClick;
 
   const addClientBtn = document.getElementById("btn-add-client");
   if (addClientBtn) addClientBtn.onclick = () => clientModal(null);
