@@ -63,6 +63,9 @@ if (!usageCols.includes("device_id")) {
 /* migration: devices predates the shareable view-link feature */
 const deviceCols = db.prepare("PRAGMA table_info(devices)").all().map(c => c.name);
 if (!deviceCols.includes("view_token")) {
+  db.exec("ALTER TABLE devices ADD COLUMN view_token TEXT");
+}
+
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
