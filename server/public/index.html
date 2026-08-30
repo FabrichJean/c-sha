@@ -655,89 +655,156 @@ function renderDashboard() {
       ${kpiCard({
         icon: "$", iconBg: "linear-gradient(135deg,#3f8f6e,#276b52)", sparkColor: "var(--good)",
         badgePct: pctChange(costTotal.today, costTotal.yest), title: "Coût estimé", big: fmtUsd(costTotal.today),
-        title: "Coût estimé",
-        periods: [
-          { label: "Aujourd'hui", value: fmtUsd(costTotal.today) },
-          { label: "Hier", value: fmtUsd(costTotal.yest) },
-          { label: "Total", value: fmtUsd(costTotal.all) },
-        ],
-        breakdown: modelsToday.map(([m, t]) => ({ color: colorForModel(m), label: modelLabel(m), value: fmtUsd(costOf(m, t)) })),
-        breakdownEmptyLabel: "Aucun coût aujourd'hui",
+        periods: [{ label: "Aujourd'hui", value: fmtUsd(costTotal.today) }, { label: "Hier", value: fmtUsd(costTotal.yest) }, { label: "Total", value: fmtUsd(costTotal.all) }],
+        sparkValues: spCost.values,
       })}
-      ${widget({
-        icon: "▤", iconBg: "linear-gradient(135deg,#6a5aa8,#4a3c80)",
-        badgePct: pctChange(cacheTotal.today, cacheTotal.yest),
-        title: "Cache",
-        periods: [
-          { label: "Aujourd'hui", value: fmtCompact(cacheTotal.today) },
-          { label: "Hier", value: fmtCompact(cacheTotal.yest) },
-          { label: "Total", value: fmtCompact(cacheTotal.all) },
-        ],
-        breakdown: [
-          { color: "var(--accent)", label: "Lecture cache", value: fmtCompact(rowsToday.reduce((s, r) => s + (r.cacheRead || 0), 0)) },
-          { color: "var(--violet)", label: "Écriture cache", value: fmtCompact(rowsToday.reduce((s, r) => s + (r.cacheCreate || 0), 0)) },
-        ],
+      ${kpiCard({
+        icon: "▤", iconBg: "linear-gradient(135deg,#6a5aa8,#4a3c80)", sparkColor: "var(--violet)",
+        badgePct: pctChange(cacheTotal.today, cacheTotal.yest), title: "Cache", big: fmtCompact(cacheTotal.today),
+        periods: [{ label: "Aujourd'hui", value: fmtCompact(cacheTotal.today) }, { label: "Hier", value: fmtCompact(cacheTotal.yest) }, { label: "Total", value: fmtCompact(cacheTotal.all) }],
+        sparkValues: spCache.values,
       })}
-      ${widget({
-        icon: "◇", iconBg: "linear-gradient(135deg,#4a7fb5,#345f8c)",
-        badgePct: pctChange(projSetToday.size, projSetYesterday.size),
-        title: "Projets actifs",
-        periods: [
-          { label: "Aujourd'hui", value: projSetToday.size },
-          { label: "Hier", value: projSetYesterday.size },
-          { label: "Total suivis", value: projSetAll.size },
-        ],
-        breakdown: topProjectsToday.map(([pkey, t], i) => {
-          const proj = projectForKey(pkey);
-          return { color: projectPalette[i % projectPalette.length], label: proj ? proj.name : pkey, value: fmtCompact(totalTokens(t)) };
-        }),
-        breakdownEmptyLabel: "Aucun projet actif aujourd'hui",
-      })}
-      ${statWidget({
-        icon: "●", iconBg: agentStatus().seen ? "linear-gradient(135deg,#2f8f5b,#206b41)" : "linear-gradient(135deg,#b9791f,#8f5c14)",
-        title: "Agent local",
-        desc: agentStatus().seen ? "Connecté à cette machine" : "Aucun contact récent",
-        big: `<span class="widget-live ${agentStatus().seen ? "on" : "off"}"><span class="w-pulse"></span>${agentStatus().seen ? "Actif" : "Hors ligne"}</span>`,
-        foot: state.agentLastSeen ? `Dernier contact : ${new Date(state.agentLastSeen).toLocaleTimeString("fr-FR")}` : "Jamais contacté",
-      })}
-      ${statWidget({
-        icon: "↻", iconBg: "linear-gradient(135deg,#8a5cc9,#5f3c96)",
-        title: "Dernière synchro",
-        desc: state.lastSync ? `${state.lastSync.written} enregistrement(s)` : "En attente du premier envoi",
-        big: state.lastSync ? new Date(state.lastSync.at).toLocaleTimeString("fr-FR") : "—",
-        foot: state.lastSync ? new Date(state.lastSync.at).toLocaleDateString("fr-FR") : "",
+      ${kpiCard({
+        icon: "◇", iconBg: "linear-gradient(135deg,#4a7fb5,#345f8c)", sparkColor: "#4a7fb5",
+        badgePct: pctChange(projSetToday.size, projSetYesterday.size), title: "Projets actifs", big: String(projSetToday.size),
+        periods: [{ label: "Aujourd'hui", value: projSetToday.size }, { label: "Hier", value: projSetYesterday.size }, { label: "Total suivis", value: projSetAll.size }],
+        sparkValues: spProjects.values,
       })}
     </div>
   `;
 
-  const byDate = aggregate(in30, r => r.date);
-  const dates = [];
-  for (let i = 29; i >= 0; i--) { const dt = new Date(now); dt.setDate(dt.getDate() - i); dates.push(dt.toISOString().slice(0, 10)); }
-  const series = dates.map(d => totalTokens(byDate.get(d) || {}));
+  /* ---- trend chart (tokens vs cout, periode choisie) ---- */
+  const period = state.trendPeriod;
+  const trendTok = dailySeries(rows, period, rs => rs.reduce((s, r) => s + totalTokens(r), 0));
+  const trendCost = dailySeries(rows, period, rs => rs.reduce((s, r) => s + costOf(r.model, r), 0));
+  const trendTok2x = dailySeries(rows, period * 2, rs => rs.reduce((s, r) => s + totalTokens(r), 0));
+  const trendCost2x = dailySeries(rows, period * 2, rs => rs.reduce((s, r) => s + costOf(r.model, r), 0));
+  const curTok = trendTok2x.values.slice(period).reduce((a, b) => a + b, 0);
+  const prevTok = trendTok2x.values.slice(0, period).reduce((a, b) => a + b, 0);
+  const curCost = trendCost2x.values.slice(period).reduce((a, b) => a + b, 0);
+  const prevCost = trendCost2x.values.slice(0, period).reduce((a, b) => a + b, 0);
+  const trendPct = state.trendMetric === "tokens" ? pctChange(curTok, prevTok) : pctChange(curCost, prevCost);
+  const trendUp = trendPct >= 0;
 
-  const byModel = aggregate(rows, r => r.model);
-  const modelEntries = [...byModel.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
+  const trendCard = `
+    <div class="card" style="margin-bottom:0">
+      <div class="trend-head">
+        <div class="trend-head-title">
+          <div class="th-icon">▦</div>
+          <h3>Consommation des ${period} derniers jours</h3>
+        </div>
+        <div class="trend-controls">
+          <div class="tabs">
+            <button data-trend-metric="tokens" class="${state.trendMetric === "tokens" ? "active" : ""}">Tokens</button>
+            <button data-trend-metric="cost" class="${state.trendMetric === "cost" ? "active" : ""}">Coût</button>
+          </div>
+          <select id="trend-period" class="period-select">
+            <option value="7" ${period === 7 ? "selected" : ""}>7 jours</option>
+            <option value="14" ${period === 14 ? "selected" : ""}>14 jours</option>
+            <option value="30" ${period === 30 ? "selected" : ""}>30 jours</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body chart-wrap">
+        <div class="legend" style="margin:0 0 10px"><span><span class="sw" style="background:#c9622a"></span>Tokens</span><span><span class="sw" style="background:var(--good)"></span>Coût (USD)</span></div>
+        ${lineChartDual(trendTok.dates, trendTok.values, trendCost.values, state.trendMetric)}
+      </div>
+      <div class="trend-foot">
+        <span class="trend-note ${trendUp ? "up" : "down"}">${trendUp ? "↗" : "↘"} ${Math.abs(trendPct).toFixed(0)}% de ${state.trendMetric === "tokens" ? "tokens" : "coût"} par rapport à la période précédente</span>
+        <button class="link-arrow" id="btn-scroll-detail">Voir le détail →</button>
+      </div>
+    </div>`;
 
+  /* ---- repartition par projet (30 jours) ---- */
   const byProject = aggregate(in30, r => r.projectKey);
-  const projectEntries = [...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1])).slice(0, 8);
-  const maxProjectVal = Math.max(1, ...projectEntries.map(([, v]) => totalTokens(v)));
+  const projectEntries = [...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
+  const projectTotal30 = projectEntries.reduce((s, [, t]) => s + totalTokens(t), 0);
+  const projColors = ["var(--accent)", "var(--violet)", "#c9622a", "var(--bad)"];
 
-  const colors = ["#21705c", "#6a5aa8", "#b9791f", "#bd4636", "#2f8f5b", "#4a7fb5", "#a8635c", "#7d8f52"];
+  const donutCard = `
+    <div class="card" style="margin-bottom:0">
+      <div class="trend-head">
+        <div class="trend-head-title">
+          <div class="th-icon" style="background:linear-gradient(135deg,#6a5aa8,#4a3c80)">◐</div>
+          <h3>Répartition par projet</h3>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="donut-row">
+          <div style="position:relative">
+            ${donutSvg(projectEntries, projColors)}
+            <div class="donut-center-label" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <div class="dc-total">Total</div>
+              <div class="dc-value">${fmtCompact(projectTotal30)}</div>
+              <div class="dc-unit">tokens</div>
+            </div>
+          </div>
+          <div class="legend-table">
+            <div class="lt-head"><span>Projet</span><span>Tokens</span><span>%</span></div>
+            ${projectEntries.length ? projectLegendTable(projectEntries, projectTotal30, projColors) : emptyMini()}
+          </div>
+        </div>
+      </div>
+      <div class="trend-foot" style="justify-content:flex-end">
+        <button class="link-arrow" data-nav="projects">Voir tous les projets →</button>
+      </div>
+    </div>`;
+
+  /* ---- agent / synchro / activite ---- */
+  const agentSeen = agentStatus().seen;
+  const agentCard = `
+    <div class="card deco-card" style="margin-bottom:0;padding:16px">
+      <div class="kpi-id" style="margin-bottom:8px">
+        <div class="kpi-icon" style="background:${agentSeen ? "linear-gradient(135deg,#2f8f5b,#206b41)" : "linear-gradient(135deg,#b9791f,#8f5c14)"}">●</div>
+        <div><div style="font-weight:650;font-size:13.5px">Agent local</div><div class="hint" style="color:var(--ink-dim);font-size:12px">${agentSeen ? "Connecté à cette machine" : "Aucun contact récent"}</div></div>
+      </div>
+      ${agentSeen ? `<div class="deco-check">✓</div>` : ""}
+      <div style="margin:14px 0 6px"><span class="widget-live ${agentSeen ? "on" : "off"}"><span class="w-pulse"></span>${agentSeen ? "Actif" : "Hors ligne"}</span></div>
+      <div class="hint" style="color:var(--ink-faint);font-size:12px">${state.agentLastSeen ? `Dernier contact : ${new Date(state.agentLastSeen).toLocaleTimeString("fr-FR")}` : "Jamais contacté"}</div>
+    </div>`;
+
+  const syncCard = `
+    <div class="card deco-card" style="margin-bottom:0;padding:16px">
+      <div class="kpi-id" style="margin-bottom:8px">
+        <div class="kpi-icon" style="background:linear-gradient(135deg,#8a5cc9,#5f3c96)">↻</div>
+        <div><div style="font-weight:650;font-size:13.5px">Dernière synchro</div><div class="hint" style="color:var(--ink-dim);font-size:12px">${state.lastSync ? `${state.lastSync.written} enregistrement(s)` : "En attente du premier envoi"}</div></div>
+      </div>
+      <div class="kpi-big" style="margin:14px 0 4px">${state.lastSync ? new Date(state.lastSync.at).toLocaleTimeString("fr-FR") : "—"}</div>
+      <div class="hint" style="color:var(--ink-faint);font-size:12px">${state.lastSync ? new Date(state.lastSync.at).toLocaleDateString("fr-FR") : ""}</div>
+    </div>`;
+
+  const activityItems = buildActivityFeed(modelsToday);
+  const activityCard = `
+    <div class="card" style="margin-bottom:0;padding:16px">
+      <div class="trend-head" style="padding:0 0 10px;border-bottom:none">
+        <h3 style="font-size:13.5px">Activité récente</h3>
+      </div>
+      ${activityItems.length ? activityItems.map(a => `
+        <div class="activity-row">
+          <span class="a-dot" style="background:${a.color}"></span>
+          <span class="a-label">${escapeHtml(a.label)}</span>
+          <span class="a-value">${escapeHtml(a.value)}</span>
+          <span class="a-time">${escapeHtml(a.time)}</span>
+        </div>`).join("") : `<div class="hint" style="color:var(--ink-faint);padding:8px 0">Rien à signaler pour l'instant.</div>`}
+    </div>`;
 
   return `
     <div class="pagehead">
-      <div><h1>Tableau de bord</h1><div class="desc">Vue d'ensemble de ta consommation de tokens Claude Code</div></div>
-      <div style="display:flex;gap:8px">
+      <div><h1>Tableau de bord</h1><div class="desc">Vue d'ensemble de ta consommation de tokens Claude Code.</div></div>
+      <div style="display:flex;align-items:center;gap:16px">
         <button class="btn" id="btn-refresh" ${state.refreshing ? "disabled" : ""}>${state.refreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir"}</button>
-        <button class="btn ghost" data-nav="import">⇩ Statut de synchro</button>
+        <button class="btn ghost" data-nav="import" style="flex-direction:column;align-items:flex-start;gap:2px;line-height:1.3">
+          <span style="font-size:11px;color:var(--ink-faint)">Statut de synchro</span>
+          <span style="font-size:12.5px;font-weight:620;display:flex;align-items:center;gap:5px"><span class="sys-dot ${agentSeen ? "ok" : "stale"}" style="width:7px;height:7px;border-radius:50%;display:inline-block;background:${agentSeen ? "var(--good)" : "var(--warn)"}"></span>${agentSeen ? "À jour" : "Décalé"}</span>
+        </button>
       </div>
     </div>
 
     ${refreshProgressBanner()}
 
-    ${widgetsHtml}
+    ${kpiHtml}
 
-    <div class="card">
+    <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:14px;align-items:start;margin-bottom:20px">
       <div class="card-head"><h3>Tokens par jour · 30 derniers jours</h3><span class="hint">total (input + output + cache)</span></div>
       <div class="card-body chart-wrap">${sparkBarChart(dates, series)}</div>
     </div>
