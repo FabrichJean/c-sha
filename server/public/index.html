@@ -1050,6 +1050,28 @@ function buildDeviceBillingCard(deviceId) {
       <div class="card-body">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px">
           <div><div class="hint" style="color:var(--ink-faint)">Total facturé</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px">${fmtUsd(b.totalBilled)}</div></div>
+          <div><div class="hint" style="color:var(--ink-faint)">Payé</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px;color:var(--good)">${fmtUsd(b.totalPaid)}</div></div>
+          <div><div class="hint" style="color:var(--ink-faint)">Restant</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px;color:${b.totalPending > 0 ? "var(--warn)" : "var(--ink-faint)"}">${fmtUsd(b.totalPending)}</div></div>
+        </div>
+        <table>
+          <thead><tr><th>Date</th><th>Client</th><th>Statut</th><th class="num">Montant</th><th></th></tr></thead>
+          <tbody>
+            ${b.entries.map(e => {
+              const client = state.clients.find(c => c.id === e.clientId);
+              return `<tr class="clickable" data-view-invoice="${e.invoiceId}">
+                <td class="mono">${new Date(e.date).toLocaleDateString("fr-FR")}</td>
+                <td>${escapeHtml(client ? client.name : "—")}</td>
+                <td><span class="dot" style="width:7px;height:7px;border-radius:50%;display:inline-block;background:${INVOICE_STATUS_COLORS[e.status]};margin-right:6px"></span>${INVOICE_STATUS_LABELS[e.status] || e.status}</td>
+                <td class="num mono">${fmtUsd(e.amount)}</td>
+                <td class="hint" style="color:var(--accent)">Voir →</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
 function renderInvoices() {
   const rows = state.invoices.slice().sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
   return `
