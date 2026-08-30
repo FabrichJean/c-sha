@@ -410,6 +410,33 @@ app.post("/api/invoices", (req, res) => {
     status: "draft", total: total || 0, line_items: JSON.stringify(lineItems || []),
     notes: notes || null, created_at: now, updated_at: now,
   };
+  db.prepare(`INSERT INTO invoices (id, client_id, period_start, period_end, status, total, line_items, notes, created_at, updated_at)
+    VALUES (@id, @client_id, @period_start, @period_end, @status, @total, @line_items, @notes, @created_at, @updated_at)`).run(row);
+  res.json({ ok: true, id: row.id });
+});
+
+app.put("/api/invoices/:id", (req, res) => {
+  const { status, lineItems, total, notes } = req.body;
+  const now = new Date().toISOString();
+  const existing = db.prepare("SELECT * FROM invoices WHERE id = ?").get(req.params.id);
+  if (!existing) return res.status(404).json({ error: "Facture introuvable." });
+  const row = {
+    id: req.params.id,
+    status: status || existing.status,
+    total: total !== undefined ? total : existing.total,
+    line_items: lineItems !== undefined ? JSON.stringify(lineItems) : existing.line_items,
+    notes: notes !== undefined ? notes : existing.notes,
+    updated_at: now,
+  };
+  db.prepare(`UPDATE invoices SET status=@status, total=@total, line_items=@line_items, notes=@notes, updated_at=@updated_at WHERE id=@id`).run(row);
+  res.json({ ok: true });
+});
+
+app.delete("/api/invoices/:id", (req, res) => {
+  db.prepare("DELETE FROM invoices WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
 app.put("/api/pricing", (req, res) => {
   const value = JSON.stringify(req.body);
   db.prepare(`INSERT INTO settings (key, value) VALUES ('pricing', @value) ON CONFLICT(key) DO UPDATE SET value = @value`).run({ value });
