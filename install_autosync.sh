@@ -3,6 +3,7 @@
 # sync_usage.sh est appele toutes les 60s mais ne pousse reellement les
 # donnees que toutes les 4h OU immediatement si le bouton "Rafraichir" du
 # CRM a demande une synchro (voir /api/request-sync) — le check frequent
+# est une simple requete HTTP legere, pas un export complet a chaque fois.
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 chmod +x "$DIR/sync_usage.sh"
@@ -25,7 +26,7 @@ cat > "$PLIST_PATH" <<EOF
     <string>$DIR/sync_usage.sh</string>
   </array>
   <key>StartInterval</key>
-  <integer>14400</integer>
+  <integer>60</integer>
   <key>RunAtLoad</key>
   <true/>
   <key>StandardOutPath</key>
@@ -41,6 +42,6 @@ launchctl unload "$PLIST_PATH" >/dev/null 2>&1 || true
 launchctl load "$PLIST_PATH"
 
 echo "Synchro automatique installee : $PLIST_LABEL"
-echo "Frequence : toutes les 4h, + immediatement au chargement."
+echo "Check toutes les 60s ; push reel toutes les 4h ou sur demande depuis le CRM."
 echo "Logs : ~/Library/Logs/ledger-autosync/"
 echo "Pour desinstaller : ./uninstall_autosync.sh"

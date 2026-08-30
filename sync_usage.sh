@@ -39,16 +39,27 @@ do_sync() {
     -H "Content-Type: application/json" \
     --data-binary "$PAYLOAD")
   if [ "$HTTP_CODE" = "200" ]; then
+    date +%s > "$STATE_FILE"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') — sync OK ($reason, HTTP $HTTP_CODE)" >> "$LOG_DIR/sync.log"
+  else
+    echo "$(date '+%Y-%m-%d %H:%M:%S') — echec sync ($reason, HTTP $HTTP_CODE) -> voir $LOG_DIR/last_response.json" >> "$LOG_DIR/sync.log"
+    exit 1
+  fi
+}
 
-HTTP_CODE=$(curl -sS -o "$LOG_DIR/last_response.json" -w "%{http_code}" \
-  -X POST "${LEDGER_URL%/}/api/sync" \
-  -H "Authorization: Bearer $LEDGER_API_KEY" \
-  -H "Content-Type: application/json" \
-  --data-binary "$PAYLOAD")
+# 1) Une synchro a-t-elle ete demandee depuis le CRM ("Rafraichir") ?
+STATUS_JSON="$(curl -sS -m 8 "$BASE_URL/api/sync-status" -H "Authorization: Bearer $LEDGER_API_KEY" || echo '{}')"
+REQUESTED="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('requested', False))" "$STATUS_JSON" 2>/dev/null || echo "False")"
 
-if [ "$HTTP_CODE" = "200" ]; then
-  echo "$(date '+%Y-%m-%d %H:%M:%S') — sync OK ($HTTP_CODE) -> $LEDGER_URL" >> "$LOG_DIR/sync.log"
-else
-  echo "$(date '+%Y-%m-%d %H:%M:%S') — echec sync (HTTP $HTTP_CODE) -> voir $LOG_DIR/last_response.json" >> "$LOG_DIR/sync.log"
-  exit 1
+if [ "$REQUESTED" = "True" ]; then
+  do_sync "demande depuis le CRM"
+  exit 0
+fi
+
+# 2) Sinon, respecter le rythme automatique normal.
+LAST_RUN=0
+[ -f "$STATE_FILE" ] && LAST_RUN="$(cat "$STATE_FILE")"
+NOW="$(date +%s)"
+if [ $((NOW - LAST_RUN)) -ge "$SYNC_INTERVAL_SECONDS" ]; then
+  do_sync "intervalle automatique"
 fi
