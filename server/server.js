@@ -170,6 +170,7 @@ app.get("/api/state", (req, res) => {
     totals: JSON.parse(u.totals),
     daily: JSON.parse(u.daily),
     importedAt: u.imported_at,
+    deviceId: u.device_id,
   }));
   const pricingRow = db.prepare("SELECT value FROM settings WHERE key = 'pricing'").get();
   const pricing = pricingRow ? JSON.parse(pricingRow.value) : null;
@@ -178,8 +179,31 @@ app.get("/api/state", (req, res) => {
   const agentSeenRow = db.prepare("SELECT value FROM settings WHERE key = 'agent_last_seen'").get();
   const agentLastSeen = agentSeenRow ? JSON.parse(agentSeenRow.value) : null;
   const syncRequested = getSyncRequest();
+  const devices = db.prepare("SELECT * FROM devices ORDER BY last_seen DESC").all().map(d => ({
+    id: d.id, name: d.name, hostname: d.hostname, firstSeen: d.first_seen, lastSeen: d.last_seen,
+  }));
+  if (usage.some(u => u.deviceId === "legacy") && !devices.some(d => d.id === "legacy")) {
+    devices.push({ id: "legacy", name: "Historique (avant suivi par appareil)", hostname: null, firstSeen: null, lastSeen: null });
+  }
 
-  res.json({ clients, projects, usage, pricing, lastSync, agentLastSeen, syncRequested });
+  res.json({ clients, projects, usage, pricing, lastSync, agentLastSeen, syncRequested, devices });
+});
+
+app.put("/api/devices/:id", (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: "Le nom est requis." });
+  const info = db.prepare("UPDATE devices SET name = ? WHERE id = ?").run(name, req.params.id);
+  if (info.changes === 0) return res.status(404).json({ error: "Appareil introuvable." });
+  res.json({ ok: true });
+});
+
+app.delete("/api/devices/:id", (req, res) => {
+  const tx = db.transaction(() => {
+    db.prepare("DELETE FROM usage_entries WHERE device_id = ?").run(req.params.id);
+    db.prepare("DELETE FROM devices WHERE id = ?").run(req.params.id);
+  });
+  tx();
+  res.json({ ok: true });
 });
 
 /* le bouton "Rafraichir" du CRM appelle ceci pour demander une synchro immediate */
