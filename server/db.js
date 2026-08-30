@@ -109,6 +109,12 @@ if (!deviceCols.includes("client_id")) {
   db.exec("ALTER TABLE devices ADD COLUMN client_id TEXT");
 }
 
+/* migration: clients predate promo code assignment */
+const clientCols = db.prepare("PRAGMA table_info(clients)").all().map(c => c.name);
+if (!clientCols.includes("promo_code_id")) {
+  db.exec("ALTER TABLE clients ADD COLUMN promo_code_id TEXT");
+}
+
 /* migration: invoices predate promo codes */
 const invoiceCols = db.prepare("PRAGMA table_info(invoices)").all().map(c => c.name);
 if (!invoiceCols.includes("subtotal")) {

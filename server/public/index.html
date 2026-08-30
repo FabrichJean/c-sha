@@ -979,14 +979,16 @@ function renderClients() {
     <div class="card">
       ${rows.length === 0 ? `<div class="empty"><div class="big">◔</div>Aucun client pour l'instant.</div>` : `
       <table>
-        <thead><tr><th>Nom</th><th>Société</th><th>Email</th><th class="num">Projets</th><th></th></tr></thead>
+        <thead><tr><th>Nom</th><th>Société</th><th>Email</th><th>Code promo</th><th class="num">Projets</th><th></th></tr></thead>
         <tbody>
           ${rows.map(c => {
             const nProj = state.projects.filter(p => p.clientId === c.id).length;
+            const promo = c.promoCodeId ? allPromoCodes().find(pc => pc.id === c.promoCodeId) : null;
             return `<tr class="clickable" data-edit-client="${c.id}">
               <td><strong>${escapeHtml(c.name)}</strong></td>
               <td>${escapeHtml(c.company || "—")}</td>
               <td>${escapeHtml(c.email || "—")}</td>
+              <td>${promo ? `<span class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:12px">${escapeHtml(promo.code)} (÷${promo.divisor})</span>` : `<span class="hint" style="color:var(--ink-faint)">—</span>`}</td>
               <td class="num mono">${nProj}</td>
               <td style="text-align:right"><button class="btn ghost sm" data-del-client="${c.id}">Supprimer</button></td>
             </tr>`;
@@ -1392,6 +1394,10 @@ function invoiceModal() {
     const { start, end } = currentPeriod();
     deviceLines = state.devices.filter(d => d.clientId === clientId).map(d => ({ id: d.id, amount: computeTokenCostForDevice(d.id, start, end).cost }));
     customLines = [];
+    const client = state.clients.find(c => c.id === clientId);
+    const clientPromo = client && client.promoCodeId ? allPromoCodes().find(pc => pc.id === client.promoCodeId) : null;
+    appliedPromo = clientPromo ? { code: clientPromo.code, divisor: clientPromo.divisor, name: clientPromo.promotionName } : null;
+    renderPromoApplied();
     renderProjectLines();
     renderDeviceSection();
     renderCustomSection();
@@ -1794,8 +1800,14 @@ function openModal(html) {
 }
 function closeModal() { const el = document.getElementById("modal-backdrop"); if (el) el.remove(); }
 
+/* liste a plat de tous les codes promo, toutes promotions confondues */
+function allPromoCodes() {
+  return state.promotions.flatMap(p => p.codes.map(c => ({ id: c.id, code: c.code, promotionName: p.name, divisor: p.divisor })));
+}
+
 function clientModal(existing) {
   const c = existing || {};
+  const codeOptions = allPromoCodes().map(pc => `<option value="${pc.id}" ${c.promoCodeId === pc.id ? "selected" : ""}>${escapeHtml(pc.code)} — ${escapeHtml(pc.promotionName)} (÷${pc.divisor})</option>`).join("");
   openModal(`
     <div class="mh">${existing ? "Modifier le client" : "Nouveau client"}</div>
     <div class="mb">
@@ -1803,6 +1815,11 @@ function clientModal(existing) {
       <div class="row2">
         <div class="field"><label>Société</label><input id="m-company" value="${escapeHtml(c.company || "")}" placeholder="Analytical Engines Inc."></div>
         <div class="field"><label>Email</label><input id="m-email" value="${escapeHtml(c.email || "")}" placeholder="ada@example.com"></div>
+      </div>
+      <div class="field">
+        <label>Code promo <span style="color:var(--ink-faint);font-weight:400">(optionnel)</span></label>
+        <select id="m-client-promo"><option value="">— aucun —</option>${codeOptions}</select>
+        <div class="hint" style="color:var(--ink-faint);font-size:11.5px;margin-top:4px">Appliqué automatiquement à chaque nouvelle facture pour ce client.</div>
       </div>
       <div class="field"><label>Notes</label><textarea id="m-notes" style="min-height:80px">${escapeHtml(c.notes || "")}</textarea></div>
     </div>
@@ -1817,6 +1834,7 @@ function clientModal(existing) {
       company: document.getElementById("m-company").value.trim(),
       email: document.getElementById("m-email").value.trim(),
       notes: document.getElementById("m-notes").value.trim(),
+      promoCodeId: document.getElementById("m-client-promo").value || null,
     };
     try {
       if (existing) await api("/api/clients/" + existing.id, { method: "PUT", body: JSON.stringify(data) });
