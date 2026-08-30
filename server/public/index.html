@@ -284,7 +284,10 @@ const state = {
   deviceRefreshing: false,
   deviceRefreshStartedAt: null,
   deviceRefreshAttempts: 0,
+  detailSearch: "",
+  detailPage: 0,
 };
+const DETAIL_PAGE_SIZE = 12;
 
 const DEFAULT_PRICING = {
   models: {
@@ -747,30 +750,58 @@ function buildDonutCard(projectEntries) {
 }
 
 function buildDetailTableCard(projectEntries, in30) {
+  const resolved = projectEntries.map(([pkey, t]) => {
+    const proj = projectForKey(pkey);
+    const client = clientForProject(proj);
+    const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
+    const name = proj ? proj.name : pkey;
+    return { pkey, proj, client, t, cost, name };
+  });
+
+  const q = state.detailSearch.trim().toLowerCase();
+  const filtered = q
+    ? resolved.filter(r => r.name.toLowerCase().includes(q) || (r.client && r.client.name.toLowerCase().includes(q)))
+    : resolved;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / DETAIL_PAGE_SIZE));
+  const page = Math.min(state.detailPage, totalPages - 1);
+  const pageRows = filtered.slice(page * DETAIL_PAGE_SIZE, (page + 1) * DETAIL_PAGE_SIZE);
+
   return `
     <div class="card" id="detail-table">
-      <div class="card-head"><h3>Détail par projet</h3><span class="hint">30 derniers jours, coût estimé</span></div>
+      <div class="card-head">
+        <h3>Détail par projet</h3>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="hint">30 derniers jours, coût estimé</span>
+          <input type="search" id="detail-search-input" placeholder="Rechercher un projet ou un client…" value="${escapeHtml(state.detailSearch)}"
+            style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink);font-size:12.5px;width:220px">
+        </div>
+      </div>
       <div class="card-body" style="padding:0">
+        ${pageRows.length === 0 ? `<div class="empty" style="padding:30px 20px">Aucun projet ne correspond à la recherche.</div>` : `
         <table>
           <thead><tr><th>Projet</th><th>Client</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th><th class="num">Coût est.</th></tr></thead>
           <tbody>
-            ${projectEntries.map(([pkey, t]) => {
-              const proj = projectForKey(pkey);
-              const client = clientForProject(proj);
-              const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
-              return `<tr>
-                <td>${escapeHtml(proj ? proj.name : pkey)}${!proj ? ` <span class="hint" style="color:var(--warn)">· non lié</span>` : ""}</td>
-                <td>${escapeHtml(client ? client.name : "—")}</td>
-                <td class="num mono">${fmtNum(t.input)}</td>
-                <td class="num mono">${fmtNum(t.output)}</td>
-                <td class="num mono">${fmtNum(t.cacheCreate + t.cacheRead)}</td>
-                <td class="num mono">${fmtNum(totalTokens(t))}</td>
-                <td class="num mono">${fmtUsd(cost)}</td>
-              </tr>`;
-            }).join("")}
+            ${pageRows.map(r => `<tr>
+                <td>${escapeHtml(r.name)}${!r.proj ? ` <span class="hint" style="color:var(--warn)">· non lié</span>` : ""}</td>
+                <td>${escapeHtml(r.client ? r.client.name : "—")}</td>
+                <td class="num mono">${fmtNum(r.t.input)}</td>
+                <td class="num mono">${fmtNum(r.t.output)}</td>
+                <td class="num mono">${fmtNum(r.t.cacheCreate + r.t.cacheRead)}</td>
+                <td class="num mono">${fmtNum(totalTokens(r.t))}</td>
+                <td class="num mono">${fmtUsd(r.cost)}</td>
+              </tr>`).join("")}
           </tbody>
-        </table>
+        </table>`}
       </div>
+      ${filtered.length > 0 ? `
+      <div class="trend-foot">
+        <span class="hint" style="color:var(--ink-faint)">${filtered.length} projet${filtered.length > 1 ? "s" : ""}${q ? ` (sur ${resolved.length})` : ""} · page ${page + 1} / ${totalPages}</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn ghost sm" id="detail-page-prev" ${page === 0 ? "disabled" : ""}>← Précédent</button>
+          <button class="btn ghost sm" id="detail-page-next" ${page >= totalPages - 1 ? "disabled" : ""}>Suivant →</button>
+        </div>
+      </div>` : ""}
     </div>`;
 }
 
@@ -1860,6 +1891,22 @@ function wireView() {
   if (periodSelect) periodSelect.onchange = () => { state.trendPeriod = parseInt(periodSelect.value, 10); render(); };
   const scrollDetailBtn = document.getElementById("btn-scroll-detail");
   if (scrollDetailBtn) scrollDetailBtn.onclick = () => document.getElementById("detail-table").scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const detailSearchInput = document.getElementById("detail-search-input");
+  if (detailSearchInput) {
+    detailSearchInput.oninput = () => {
+      const pos = detailSearchInput.selectionStart;
+      state.detailSearch = detailSearchInput.value;
+      state.detailPage = 0;
+      render();
+      const el = document.getElementById("detail-search-input");
+      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+    };
+  }
+  const detailPagePrev = document.getElementById("detail-page-prev");
+  if (detailPagePrev) detailPagePrev.onclick = () => { state.detailPage = Math.max(0, state.detailPage - 1); render(); };
+  const detailPageNext = document.getElementById("detail-page-next");
+  if (detailPageNext) detailPageNext.onclick = () => { state.detailPage++; render(); };
 
   const addClientBtn = document.getElementById("btn-add-client");
   if (addClientBtn) addClientBtn.onclick = () => clientModal(null);
