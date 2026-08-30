@@ -110,18 +110,6 @@ function getPricing() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'pricing'").get();
   return row ? JSON.parse(row.value) : DEFAULT_PRICING_SERVER;
 }
-
-  const rowsToday = daily.filter(r => r.date === today);
-  const rowsYesterday = daily.filter(r => r.date === yesterday);
-  const allTotal = { tokens: sumTokens(daily), cost: sumCost(daily), cache: sumCache(daily) };
-
-  return {
-    tokens: { today: sumTokens(rowsToday), yesterday: sumTokens(rowsYesterday), total: allTotal.tokens, sparkline: byDay(7, sumTokens) },
-    cost: { today: sumCost(rowsToday), yesterday: sumCost(rowsYesterday), total: allTotal.cost, sparkline: byDay(7, sumCost) },
-    cache: { today: sumCache(rowsToday), yesterday: sumCache(rowsYesterday), total: allTotal.cache, sparkline: byDay(7, sumCache) },
-  };
-}
-
 /* ---------------- sync ingestion (shared by script push + manual browser import) ---------------- */
 function ingestUsagePayload(payload) {
   if (!payload || !Array.isArray(payload.projects)) {
@@ -229,6 +217,25 @@ function requireDeviceToken(req, res, next) {
   next();
 }
 
+/* nom du projet uniquement (jamais le client associe) — un lien partage ne doit
+   pas reveler l'identite des clients a quelqu'un d'externe */
+function getProjectNamesMap() {
+  const map = {};
+  for (const p of db.prepare("SELECT name, project_keys FROM projects").all()) {
+    for (const key of JSON.parse(p.project_keys || "[]")) map[key] = p.name;
+  }
+  return map;
+}
+
+function getDeviceDailyRows(deviceId) {
+  const rows = [];
+  for (const u of db.prepare("SELECT project_key, model, daily FROM usage_entries WHERE device_id = ?").all(deviceId)) {
+    const daily = JSON.parse(u.daily || "{}");
+    for (const [date, t] of Object.entries(daily)) rows.push({ date, projectKey: u.project_key, model: u.model, ...t });
+  }
+  return rows;
+}
+
 app.get("/api/device-view/:deviceId/:token", requireDeviceToken, (req, res) => {
   const d = db.prepare("SELECT * FROM devices WHERE id = ?").get(req.params.deviceId);
   const lastDataRow = db.prepare("SELECT MAX(imported_at) at FROM usage_entries WHERE device_id = ?").get(req.params.deviceId);
@@ -237,7 +244,9 @@ app.get("/api/device-view/:deviceId/:token", requireDeviceToken, (req, res) => {
     device: { id: d.id, name: d.name, hostname: d.hostname, firstSeen: d.first_seen, lastSeen: d.last_seen },
     seen: secAgo < 150,
     lastDataAt: lastDataRow ? lastDataRow.at : null,
-    kpis: computeDeviceKpis(req.params.deviceId),
+    rows: getDeviceDailyRows(req.params.deviceId),
+    pricing: getPricing(),
+    projectNames: getProjectNamesMap(),
   });
 });
 
