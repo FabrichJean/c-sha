@@ -1055,6 +1055,70 @@ function invoiceModal() {
     <div class="mh">Nouvelle facture</div>
     <div class="mb">
       <div class="row2">
+        <div class="field"><label>Client</label><select id="m-inv-client"><option value="">— choisir —</option>${clientOptions}</select></div>
+        <div class="field"><label>Mois</label><input id="m-inv-month" type="month" value="${defaultMonth}"></div>
+      </div>
+      <div id="m-inv-lines"><div class="hint" style="color:var(--ink-faint);padding:10px 0">Choisis un client pour voir ses projets.</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border);margin-top:6px">
+        <strong>Total</strong><strong class="mono" id="m-inv-total">$0.00</strong>
+      </div>
+    </div>
+    <div class="mf"><button class="btn ghost" id="m-cancel">Annuler</button><button class="btn primary" id="m-save" disabled>Créer la facture</button></div>
+  `);
+  document.getElementById("m-cancel").onclick = closeModal;
+
+  function currentLines() {
+    const clientId = document.getElementById("m-inv-client").value;
+    const projects = state.projects.filter(p => p.clientId === clientId);
+    return { clientId, projects };
+  }
+
+  function recomputeLines() {
+    const { clientId, projects } = currentLines();
+    const saveBtn = document.getElementById("m-save");
+    const linesEl = document.getElementById("m-inv-lines");
+    if (!clientId) {
+      linesEl.innerHTML = `<div class="hint" style="color:var(--ink-faint);padding:10px 0">Choisis un client pour voir ses projets.</div>`;
+      saveBtn.disabled = true;
+      document.getElementById("m-inv-total").textContent = fmtUsd(0);
+      return;
+    }
+    if (projects.length === 0) {
+      linesEl.innerHTML = `<div class="hint" style="color:var(--warn);padding:10px 0">Ce client n'a aucun projet lié — rien à facturer.</div>`;
+      saveBtn.disabled = true;
+      document.getElementById("m-inv-total").textContent = fmtUsd(0);
+      return;
+    }
+    const month = document.getElementById("m-inv-month").value;
+    const { start, end } = monthBounds(month);
+    linesEl.innerHTML = `
+      <table style="margin-top:10px">
+        <thead><tr><th>Projet</th><th>Mode</th><th class="num">Détail</th><th class="num">Montant</th></tr></thead>
+        <tbody>
+          ${projects.map(p => {
+            if (p.billingMode === "hourly") {
+              return `<tr>
+                <td>${escapeHtml(p.name)}</td>
+                <td class="hint">Taux horaire</td>
+                <td class="num"><input type="number" step="0.5" min="0" value="0" data-hours-for="${p.id}" style="width:70px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)"> h × $${p.rate || 0}</td>
+                <td class="num mono" id="m-line-amount-${p.id}">$0.00</td>
+              </tr>`;
+            }
+            const { tokens, cost } = computeTokenCostForProject(p, start, end);
+            return `<tr>
+              <td>${escapeHtml(p.name)}</td>
+              <td class="hint">Coût tokens</td>
+              <td class="num mono">${fmtCompact(tokens)} tok</td>
+              <td class="num mono" id="m-line-amount-${p.id}" data-fixed-amount="${cost}">${fmtUsd(cost)}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`;
+    linesEl.querySelectorAll("[data-hours-for]").forEach(input => {
+      input.oninput = () => {
+        const pid = input.dataset.hoursFor;
+        const project = projects.find(p => p.id === pid);
+        const amount = (parseFloat(input.value) || 0) * (project.rate || 0);
 /* ---- devices ---- */
 function deviceStatus(device) {
   if (!device.lastSeen) return { seen: false, historic: true, label: "Historique" };
