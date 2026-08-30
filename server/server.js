@@ -156,7 +156,7 @@ function ingestUsagePayload(payload) {
 app.post("/api/sync", requireApiKey, (req, res) => {
   try {
     const result = ingestUsagePayload(req.body);
-    clearSyncRequest();
+    ackSyncRequest(result.deviceId);
     clearDeviceSyncRequest(result.deviceId);
     res.json({ ok: true, ...result });
   } catch (e) {
@@ -173,7 +173,7 @@ app.get("/api/sync-status", requireApiKey, (req, res) => {
     .run({ v: JSON.stringify(now) });
   const deviceId = req.query.deviceId;
   if (deviceId) upsertDevice(deviceId, req.query.deviceName, req.query.deviceName);
-  const globalReq = getSyncRequest();
+  const globalReq = isGlobalSyncPending(deviceId);
   const deviceReq = deviceId ? getDeviceSyncRequest(deviceId) : null;
   res.json({ requested: !!globalReq || !!deviceReq, requestedAt: deviceReq || globalReq });
 });
@@ -202,7 +202,7 @@ app.get("/api/sync-wait", requireApiKey, (req, res) => {
 
   const check = () => {
     if (res.writableEnded) return;
-    const globalReq = getSyncRequest();
+    const globalReq = isGlobalSyncPending(deviceId);
     const deviceReq = deviceId ? getDeviceSyncRequest(deviceId) : null;
     if (globalReq || deviceReq) {
       cleanup();
@@ -217,12 +217,42 @@ app.get("/api/sync-wait", requireApiKey, (req, res) => {
   check();
 });
 
+/* demande de synchro globale (bouton "Rafraichir" du CRM) : doit toucher TOUS
+   les appareils, pas seulement le premier qui repond. On memorise donc la
+   liste des appareils encore en attente d'accuser reception, plutot qu'un
+   simple flag efface par la premiere synchro venue (ce qui laissait les
+   autres appareils sans synchro immediate, silencieusement rattrapes par le
+   seul intervalle de 4h). */
 function getSyncRequest() {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'sync_requested'").get();
   return row ? JSON.parse(row.value) : null;
 }
-function clearSyncRequest() {
-  db.prepare("DELETE FROM settings WHERE key = 'sync_requested'").run();
+function setSyncRequest() {
+  const deviceIds = db.prepare("SELECT id FROM devices").all().map(d => d.id);
+  const value = { at: new Date().toISOString(), deviceIds };
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('sync_requested', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
+    .run({ v: JSON.stringify(value) });
+}
+function isGlobalSyncPending(deviceId) {
+  const req = getSyncRequest();
+  if (!req) return null;
+  if (deviceId && Array.isArray(req.deviceIds) && !req.deviceIds.includes(deviceId)) return null;
+  return req.at;
+}
+function ackSyncRequest(deviceId) {
+  const req = getSyncRequest();
+  if (!req) return;
+  if (!Array.isArray(req.deviceIds)) {
+    db.prepare("DELETE FROM settings WHERE key = 'sync_requested'").run();
+    return;
+  }
+  const remaining = req.deviceIds.filter(id => id !== deviceId);
+  if (remaining.length === 0) {
+    db.prepare("DELETE FROM settings WHERE key = 'sync_requested'").run();
+  } else {
+    db.prepare(`INSERT INTO settings (key, value) VALUES ('sync_requested', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
+      .run({ v: JSON.stringify({ ...req, deviceIds: remaining }) });
+  }
 }
 
 /* demandes de synchro ciblees sur un seul appareil (bouton "Rafraichir" d'une page device) */
@@ -390,10 +420,8 @@ app.delete("/api/devices/:id", (req, res) => {
 
 /* le bouton "Rafraichir" du CRM appelle ceci pour demander une synchro immediate */
 app.post("/api/request-sync", (req, res) => {
-  const now = new Date().toISOString();
-  db.prepare(`INSERT INTO settings (key, value) VALUES ('sync_requested', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
-    .run({ v: JSON.stringify(now) });
-  res.json({ ok: true, requestedAt: now });
+  setSyncRequest();
+  res.json({ ok: true, ...getSyncRequest() });
 });
 
 /* import manuel depuis le navigateur (secours si le push automatique est indisponible) */
