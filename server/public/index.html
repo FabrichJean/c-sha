@@ -1162,20 +1162,28 @@ function invoiceModal() {
       btn.onclick = () => { customLines = customLines.filter(l => l.id !== btn.dataset.removeCustomLine); renderCustomSection(); updateTotal(); };
     });
     const addBtn = document.getElementById("btn-add-custom-line");
+    if (addBtn) addBtn.onclick = () => {
+      customLines.push({ id: "c" + Date.now() + Math.random().toString(36).slice(2, 6), label: "", amount: 0 });
+      renderCustomSection();
+      updateTotal();
+    };
+  }
+
+  function renderProjectLines() {
     const { clientId, projects } = currentLines();
     const saveBtn = document.getElementById("m-save");
     const linesEl = document.getElementById("m-inv-lines");
-    extraDeviceIds = [];
     if (!clientId) {
       linesEl.innerHTML = `<div class="hint" style="color:var(--ink-faint);padding:10px 0">Choisis un client pour voir ses projets.</div>`;
       document.getElementById("m-inv-devices").innerHTML = "";
+      document.getElementById("m-inv-custom").innerHTML = "";
       saveBtn.disabled = true;
       document.getElementById("m-inv-total").textContent = fmtUsd(0);
       return;
     }
     const { start, end } = currentPeriod();
     if (projects.length === 0) {
-      linesEl.innerHTML = `<div class="hint" style="color:var(--warn);padding:10px 0">Ce client n'a aucun projet lié — ajoute un appareil ci-dessous, ou relie-lui un projet.</div>`;
+      linesEl.innerHTML = `<div class="hint" style="color:var(--warn);padding:10px 0">Ce client n'a aucun projet lié — ajoute un appareil ou un montant personnalisé ci-dessous, ou relie-lui un projet.</div>`;
     } else {
       linesEl.innerHTML = `
         <table style="margin-top:10px">
@@ -1212,17 +1220,30 @@ function invoiceModal() {
       });
     }
     saveBtn.disabled = false;
+  }
+
+  function updateTotal() {
+    const fixed = [...document.querySelectorAll("[id^='m-line-amount-']")].map(el => parseFloat(el.dataset.fixedAmount) || 0);
+    const custom = customLines.reduce((s, l) => s + (l.amount || 0), 0);
+    document.getElementById("m-inv-total").textContent = fmtUsd(fixed.reduce((a, b) => a + b, 0) + custom);
+  }
+
+  function onClientChange() {
+    extraDeviceIds = [];
+    customLines = [];
+    renderProjectLines();
+    renderDeviceSection();
+    renderCustomSection();
+    updateTotal();
+  }
+  function onMonthChange() {
+    renderProjectLines();
     renderDeviceSection();
     updateTotal();
   }
 
-  function updateTotal() {
-    const amounts = [...document.querySelectorAll("[id^='m-line-amount-']")].map(el => parseFloat(el.dataset.fixedAmount) || 0);
-    document.getElementById("m-inv-total").textContent = fmtUsd(amounts.reduce((a, b) => a + b, 0));
-  }
-
-  document.getElementById("m-inv-client").onchange = recomputeLines;
-  document.getElementById("m-inv-month").onchange = recomputeLines;
+  document.getElementById("m-inv-client").onchange = onClientChange;
+  document.getElementById("m-inv-month").onchange = onMonthChange;
 
   document.getElementById("m-save").onclick = async () => {
     const { clientId, projects } = currentLines();
@@ -1242,8 +1263,11 @@ function invoiceModal() {
       const { tokens, cost } = computeTokenCostForDevice(id, start, end);
       return { deviceId: id, projectName: device ? device.name : id, billingMode: "device", tokens, amount: cost };
     });
-    const lineItems = [...projectLines, ...deviceLines];
-    if (!clientId || lineItems.length === 0) { toast("Ajoute au moins un projet ou un appareil"); return; }
+    const manualLines = customLines.filter(l => l.amount || l.label).map(l => ({
+      projectName: l.label.trim() || "Montant personnalisé", billingMode: "custom", amount: l.amount || 0,
+    }));
+    const lineItems = [...projectLines, ...deviceLines, ...manualLines];
+    if (!clientId || lineItems.length === 0) { toast("Ajoute au moins un projet, un appareil ou un montant"); return; }
     const total = lineItems.reduce((s, l) => s + l.amount, 0);
     try {
       await api("/api/invoices", { method: "POST", body: JSON.stringify({ clientId, periodStart: start, periodEnd: end, lineItems, total }) });
@@ -1263,7 +1287,7 @@ function renderInvoiceDetail() {
       <div>
         <button class="link-arrow" data-nav="invoices" style="margin-bottom:8px;display:inline-block">← Factures</button>
         <h1>Facture — ${escapeHtml(client ? client.name : "Client supprimé")}</h1>
-        <div class="desc">Période du ${inv.periodStart} au ${inv.periodEnd} · document à usage interne, non fiscal</div>
+        <div class="desc">${inv.periodStart ? `Période du ${inv.periodStart} au ${inv.periodEnd}` : "Période non spécifiée"} · document à usage interne, non fiscal</div>
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn" id="btn-print-invoice">Imprimer</button>
@@ -1292,8 +1316,8 @@ function renderInvoiceDetail() {
           <tbody>
             ${inv.lineItems.map(l => `<tr>
               <td>${escapeHtml(l.projectName)}</td>
-              <td class="hint">${l.billingMode === "hourly" ? "Taux horaire" : l.billingMode === "device" ? "Appareil" : "Coût tokens"}</td>
-              <td class="num mono">${l.billingMode === "hourly" ? `${l.hours} h × $${l.rate}` : `${fmtCompact(l.tokens)} tok`}</td>
+              <td class="hint">${l.billingMode === "hourly" ? "Taux horaire" : l.billingMode === "device" ? "Appareil" : l.billingMode === "custom" ? "Montant libre" : "Coût tokens"}</td>
+              <td class="num mono">${l.billingMode === "hourly" ? `${l.hours} h × $${l.rate}` : l.billingMode === "custom" ? "—" : `${fmtCompact(l.tokens)} tok`}</td>
               <td class="num mono">${fmtUsd(l.amount)}</td>
             </tr>`).join("")}
           </tbody>
