@@ -1133,54 +1133,54 @@ function invoiceModal() {
     const { clientId, projects } = currentLines();
     const saveBtn = document.getElementById("m-save");
     const linesEl = document.getElementById("m-inv-lines");
+    extraDeviceIds = [];
     if (!clientId) {
       linesEl.innerHTML = `<div class="hint" style="color:var(--ink-faint);padding:10px 0">Choisis un client pour voir ses projets.</div>`;
+      document.getElementById("m-inv-devices").innerHTML = "";
       saveBtn.disabled = true;
       document.getElementById("m-inv-total").textContent = fmtUsd(0);
       return;
     }
+    const { start, end } = currentPeriod();
     if (projects.length === 0) {
-      linesEl.innerHTML = `<div class="hint" style="color:var(--warn);padding:10px 0">Ce client n'a aucun projet lié — rien à facturer.</div>`;
-      saveBtn.disabled = true;
-      document.getElementById("m-inv-total").textContent = fmtUsd(0);
-      return;
-    }
-    const month = document.getElementById("m-inv-month").value;
-    const { start, end } = monthBounds(month);
-    linesEl.innerHTML = `
-      <table style="margin-top:10px">
-        <thead><tr><th>Projet</th><th>Mode</th><th class="num">Détail</th><th class="num">Montant</th></tr></thead>
-        <tbody>
-          ${projects.map(p => {
-            if (p.billingMode === "hourly") {
+      linesEl.innerHTML = `<div class="hint" style="color:var(--warn);padding:10px 0">Ce client n'a aucun projet lié — ajoute un appareil ci-dessous, ou relie-lui un projet.</div>`;
+    } else {
+      linesEl.innerHTML = `
+        <table style="margin-top:10px">
+          <thead><tr><th>Projet</th><th>Mode</th><th class="num">Détail</th><th class="num">Montant</th></tr></thead>
+          <tbody>
+            ${projects.map(p => {
+              if (p.billingMode === "hourly") {
+                return `<tr>
+                  <td>${escapeHtml(p.name)}</td>
+                  <td class="hint">Taux horaire</td>
+                  <td class="num"><input type="number" step="0.5" min="0" value="0" data-hours-for="${p.id}" style="width:70px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)"> h × $${p.rate || 0}</td>
+                  <td class="num mono" id="m-line-amount-${p.id}">$0.00</td>
+                </tr>`;
+              }
+              const { tokens, cost } = computeTokenCostForProject(p, start, end);
               return `<tr>
                 <td>${escapeHtml(p.name)}</td>
-                <td class="hint">Taux horaire</td>
-                <td class="num"><input type="number" step="0.5" min="0" value="0" data-hours-for="${p.id}" style="width:70px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)"> h × $${p.rate || 0}</td>
-                <td class="num mono" id="m-line-amount-${p.id}">$0.00</td>
+                <td class="hint">Coût tokens</td>
+                <td class="num mono">${fmtCompact(tokens)} tok</td>
+                <td class="num mono" id="m-line-amount-${p.id}" data-fixed-amount="${cost}">${fmtUsd(cost)}</td>
               </tr>`;
-            }
-            const { tokens, cost } = computeTokenCostForProject(p, start, end);
-            return `<tr>
-              <td>${escapeHtml(p.name)}</td>
-              <td class="hint">Coût tokens</td>
-              <td class="num mono">${fmtCompact(tokens)} tok</td>
-              <td class="num mono" id="m-line-amount-${p.id}" data-fixed-amount="${cost}">${fmtUsd(cost)}</td>
-            </tr>`;
-          }).join("")}
-        </tbody>
-      </table>`;
-    linesEl.querySelectorAll("[data-hours-for]").forEach(input => {
-      input.oninput = () => {
-        const pid = input.dataset.hoursFor;
-        const project = projects.find(p => p.id === pid);
-        const amount = (parseFloat(input.value) || 0) * (project.rate || 0);
-        document.getElementById("m-line-amount-" + pid).textContent = fmtUsd(amount);
-        document.getElementById("m-line-amount-" + pid).dataset.fixedAmount = amount;
-        updateTotal();
-      };
-    });
+            }).join("")}
+          </tbody>
+        </table>`;
+      linesEl.querySelectorAll("[data-hours-for]").forEach(input => {
+        input.oninput = () => {
+          const pid = input.dataset.hoursFor;
+          const project = projects.find(p => p.id === pid);
+          const amount = (parseFloat(input.value) || 0) * (project.rate || 0);
+          document.getElementById("m-line-amount-" + pid).textContent = fmtUsd(amount);
+          document.getElementById("m-line-amount-" + pid).dataset.fixedAmount = amount;
+          updateTotal();
+        };
+      });
+    }
     saveBtn.disabled = false;
+    renderDeviceSection();
     updateTotal();
   }
 
@@ -1194,9 +1194,8 @@ function invoiceModal() {
 
   document.getElementById("m-save").onclick = async () => {
     const { clientId, projects } = currentLines();
-    const month = document.getElementById("m-inv-month").value;
-    const { start, end } = monthBounds(month);
-    const lineItems = projects.map(p => {
+    const { start, end } = currentPeriod();
+    const projectLines = projects.map(p => {
       const amountEl = document.getElementById("m-line-amount-" + p.id);
       const amount = parseFloat(amountEl.dataset.fixedAmount) || 0;
       if (p.billingMode === "hourly") {
@@ -1206,6 +1205,13 @@ function invoiceModal() {
       const { tokens } = computeTokenCostForProject(p, start, end);
       return { projectId: p.id, projectName: p.name, billingMode: "tokens", tokens, amount };
     });
+    const deviceLines = extraDeviceIds.map(id => {
+      const device = state.devices.find(d => d.id === id);
+      const { tokens, cost } = computeTokenCostForDevice(id, start, end);
+      return { deviceId: id, projectName: device ? device.name : id, billingMode: "device", tokens, amount: cost };
+    });
+    const lineItems = [...projectLines, ...deviceLines];
+    if (!clientId || lineItems.length === 0) { toast("Ajoute au moins un projet ou un appareil"); return; }
     const total = lineItems.reduce((s, l) => s + l.amount, 0);
     try {
       await api("/api/invoices", { method: "POST", body: JSON.stringify({ clientId, periodStart: start, periodEnd: end, lineItems, total }) });
@@ -1250,11 +1256,11 @@ function renderInvoiceDetail() {
       <div class="card-head"><h3>Détail</h3></div>
       <div class="card-body" style="padding:0">
         <table>
-          <thead><tr><th>Projet</th><th>Mode</th><th class="num">Détail</th><th class="num">Montant</th></tr></thead>
+          <thead><tr><th>Poste</th><th>Mode</th><th class="num">Détail</th><th class="num">Montant</th></tr></thead>
           <tbody>
             ${inv.lineItems.map(l => `<tr>
               <td>${escapeHtml(l.projectName)}</td>
-              <td class="hint">${l.billingMode === "hourly" ? "Taux horaire" : "Coût tokens"}</td>
+              <td class="hint">${l.billingMode === "hourly" ? "Taux horaire" : l.billingMode === "device" ? "Appareil" : "Coût tokens"}</td>
               <td class="num mono">${l.billingMode === "hourly" ? `${l.hours} h × $${l.rate}` : `${fmtCompact(l.tokens)} tok`}</td>
               <td class="num mono">${fmtUsd(l.amount)}</td>
             </tr>`).join("")}
