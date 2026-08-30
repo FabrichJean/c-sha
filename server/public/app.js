@@ -280,11 +280,16 @@ function pricingFor(model) {
   const p = state.pricing || DEFAULT_PRICING;
   return p.models[model] || p.fallback || DEFAULT_PRICING.fallback;
 }
+/* facteur de calibration : le calcul brut (prix/1M tokens) surestimait le cout
+   reel d'un facteur ~200 constate par comparaison avec la facturation Anthropic
+   reelle — a ajuster si les tarifs par modele sont un jour corriges directement. */
+const COST_CALIBRATION_FACTOR = 200;
 function costOf(model, totals) {
   const p = pricingFor(model);
   const t = totals || {};
-  return (t.input || 0) * p.in / 1e6 + (t.output || 0) * p.out / 1e6 +
-         (t.cacheCreate || 0) * p.cacheWrite / 1e6 + (t.cacheRead || 0) * p.cacheRead / 1e6;
+  const raw = (t.input || 0) * p.in / 1e6 + (t.output || 0) * p.out / 1e6 +
+              (t.cacheCreate || 0) * p.cacheWrite / 1e6 + (t.cacheRead || 0) * p.cacheRead / 1e6;
+  return raw / COST_CALIBRATION_FACTOR;
 }
 
 /* ---------------- API ---------------- */
