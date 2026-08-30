@@ -98,6 +98,16 @@ sync|uninstall`. Les binaires (`ledger-agent-macos`, `ledger-agent-linux`,
 `.github/workflows/release.yml` à chaque tag `v*` poussé sur le dépôt — il faut
 qu'au moins une release existe avant de lancer ces scripts.
 
+**Terminal sans TTY** (rare — cron, CI, certains clients SSH non-interactifs) :
+`install.sh` détecte l'absence de terminal et saute `configure`/`install` en
+affichant les deux commandes à relancer toi-même une fois connecté normalement.
+Dans ce cas (ou si tu préfères configurer à la main) :
+
+```bash
+~/.ledger/bin/ledger-agent configure
+~/.ledger/bin/ledger-agent install
+```
+
 ## Variables d'environnement
 
 | Variable | Rôle | Défaut |
