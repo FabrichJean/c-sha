@@ -69,6 +69,21 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS promotions (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    divisor REAL NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS promo_codes (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    promotion_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE CASCADE
+  );
 `);
 
 /* migration: usage_entries predates per-device tracking */
@@ -92,6 +107,18 @@ if (!projectCols.includes("billing_mode")) {
 /* migration: devices predates client linking */
 if (!deviceCols.includes("client_id")) {
   db.exec("ALTER TABLE devices ADD COLUMN client_id TEXT");
+}
+
+/* migration: invoices predate promo codes */
+const invoiceCols = db.prepare("PRAGMA table_info(invoices)").all().map(c => c.name);
+if (!invoiceCols.includes("subtotal")) {
+  db.exec("ALTER TABLE invoices ADD COLUMN subtotal REAL");
+}
+if (!invoiceCols.includes("promo_code")) {
+  db.exec("ALTER TABLE invoices ADD COLUMN promo_code TEXT");
+}
+if (!invoiceCols.includes("promo_divisor")) {
+  db.exec("ALTER TABLE invoices ADD COLUMN promo_divisor REAL");
 }
 
 function uid() {

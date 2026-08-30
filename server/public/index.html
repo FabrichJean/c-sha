@@ -241,6 +241,7 @@
     <button class="navitem" data-view="clients"><span class="ic" style="color:var(--violet)">◔</span>Clients</button>
     <button class="navitem" data-view="projects"><span class="ic" style="color:#c9622a">◇</span>Projets</button>
     <button class="navitem" data-view="invoices"><span class="ic" style="color:#8a5cc9">▥</span>Factures</button>
+    <button class="navitem" data-view="promotions"><span class="ic" style="color:#c9427a">%</span>Promotions</button>
     <button class="navitem" data-view="import"><span class="ic" style="color:#4a7fb5">⇩</span>Synchro</button>
     <button class="navitem" data-view="devices"><span class="ic" style="color:#3f8f6e">▧</span>Appareils</button>
     <button class="navitem" data-view="settings"><span class="ic" style="color:var(--bad)">⚙</span>Tarifs</button>
@@ -270,6 +271,7 @@ const state = {
   usage: [],
   devices: [],
   invoices: [],
+  promotions: [],
   pricing: null,
   lastSync: null,
   agentLastSeen: null,
@@ -541,6 +543,7 @@ async function loadState() {
     state.usage = data.usage || [];
     state.devices = data.devices || [];
     state.invoices = data.invoices || [];
+    state.promotions = data.promotions || [];
     state.pricing = data.pricing || DEFAULT_PRICING;
     state.lastSync = data.lastSync || null;
     state.agentLastSeen = data.agentLastSeen || null;
@@ -611,6 +614,7 @@ function render() {
   else if (state.view === "projects") main.innerHTML = renderProjects();
   else if (state.view === "invoices") main.innerHTML = renderInvoices();
   else if (state.view === "invoice-detail") main.innerHTML = renderInvoiceDetail();
+  else if (state.view === "promotions") main.innerHTML = renderPromotions();
   else if (state.view === "import") main.innerHTML = renderImport();
   else if (state.view === "devices") main.innerHTML = renderDevices();
   else if (state.view === "device-detail") main.innerHTML = renderDeviceDetail();
@@ -1145,6 +1149,7 @@ function invoiceModal() {
   const clientOptions = state.clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
   let deviceLines = []; // {id, amount}
   let customLines = []; // {id, label, amount}
+  let appliedPromo = null; // {code, divisor, name}
 
   openModal(`
     <div class="mh">Nouvelle facture</div>
@@ -1157,13 +1162,55 @@ function invoiceModal() {
       <div id="m-inv-lines"><div class="hint" style="color:var(--ink-faint);padding:10px 0">Choisis un client pour voir ses projets.</div></div>
       <div id="m-inv-devices"></div>
       <div id="m-inv-custom"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--border);margin-top:6px">
-        <strong>Total</strong><strong class="mono" id="m-inv-total">$0.00</strong>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <label style="font-size:12px;font-weight:600;color:var(--ink-dim)">Code promo <span style="color:var(--ink-faint);font-weight:400">(optionnel)</span></label>
+        <div id="m-inv-promo-row" style="display:flex;gap:8px;margin-top:6px">
+          <input id="m-inv-promo-code" placeholder="CODE" style="flex:1;text-transform:uppercase;border:1px solid var(--border);border-radius:7px;padding:7px 10px;background:var(--bg);color:var(--ink)">
+          <button class="btn sm" id="btn-apply-promo">Appliquer</button>
+        </div>
+        <div id="m-inv-promo-applied"></div>
+      </div>
+      <div style="padding-top:10px;border-top:1px solid var(--border);margin-top:6px">
+        <div id="m-inv-subtotal-row" style="display:none;justify-content:space-between;color:var(--ink-dim);font-size:12.5px;padding-bottom:4px"><span>Sous-total</span><span class="mono" id="m-inv-subtotal">$0.00</span></div>
+        <div id="m-inv-discount-row" style="display:none;justify-content:space-between;color:var(--good);font-size:12.5px;padding-bottom:4px"><span>Réduction</span><span class="mono" id="m-inv-discount">-$0.00</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Total</strong><strong class="mono" id="m-inv-total">$0.00</strong>
+        </div>
       </div>
     </div>
     <div class="mf"><button class="btn ghost" id="m-cancel">Annuler</button><button class="btn primary" id="m-save" disabled>Créer la facture</button></div>
   `);
   document.getElementById("m-cancel").onclick = closeModal;
+
+  function renderPromoApplied() {
+    const appliedEl = document.getElementById("m-inv-promo-applied");
+    const row = document.getElementById("m-inv-promo-row");
+    if (appliedPromo) {
+      row.style.display = "none";
+      appliedEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:7px 10px;margin-top:6px">
+        <span style="font-size:12.5px"><strong class="mono">${escapeHtml(appliedPromo.code)}</strong> — ${escapeHtml(appliedPromo.name)} (÷${appliedPromo.divisor})</span>
+        <button class="btn ghost sm" id="btn-remove-promo">Retirer</button>
+      </div>`;
+      document.getElementById("btn-remove-promo").onclick = () => { appliedPromo = null; renderPromoApplied(); updateTotal(); };
+    } else {
+      row.style.display = "flex";
+      appliedEl.innerHTML = "";
+    }
+  }
+
+  document.getElementById("btn-apply-promo").onclick = () => {
+    const raw = document.getElementById("m-inv-promo-code").value.trim().toUpperCase();
+    if (!raw) return;
+    let match = null;
+    for (const p of state.promotions) {
+      const code = p.codes.find(c => c.code.toUpperCase() === raw);
+      if (code) { match = { code: code.code, divisor: p.divisor, name: p.name }; break; }
+    }
+    if (!match) { toast("Code promo invalide"); return; }
+    appliedPromo = match;
+    renderPromoApplied();
+    updateTotal();
+  };
 
   function currentLines() {
     const clientId = document.getElementById("m-inv-client").value;
@@ -1329,7 +1376,15 @@ function invoiceModal() {
     const fixed = [...document.querySelectorAll("[id^='m-line-amount-']")].map(el => parseFloat(el.dataset.fixedAmount) || 0);
     const devices = deviceLines.reduce((s, dl) => s + (dl.amount || 0), 0);
     const custom = customLines.reduce((s, l) => s + (l.amount || 0), 0);
-    document.getElementById("m-inv-total").textContent = fmtUsd(fixed.reduce((a, b) => a + b, 0) + devices + custom);
+    const subtotal = fixed.reduce((a, b) => a + b, 0) + devices + custom;
+    const total = appliedPromo ? subtotal / appliedPromo.divisor : subtotal;
+    document.getElementById("m-inv-subtotal-row").style.display = appliedPromo ? "flex" : "none";
+    document.getElementById("m-inv-discount-row").style.display = appliedPromo ? "flex" : "none";
+    if (appliedPromo) {
+      document.getElementById("m-inv-subtotal").textContent = fmtUsd(subtotal);
+      document.getElementById("m-inv-discount").textContent = "-" + fmtUsd(subtotal - total);
+    }
+    document.getElementById("m-inv-total").textContent = fmtUsd(total);
   }
 
   function onClientChange() {
@@ -1381,9 +1436,12 @@ function invoiceModal() {
     }));
     const lineItems = [...projectLines, ...deviceLineItems, ...manualLines];
     if (!clientId || lineItems.length === 0) { toast("Ajoute au moins un projet, un appareil ou un montant"); return; }
-    const total = lineItems.reduce((s, l) => s + l.amount, 0);
+    const subtotal = lineItems.reduce((s, l) => s + l.amount, 0);
+    const total = appliedPromo ? subtotal / appliedPromo.divisor : subtotal;
+    const promoCode = appliedPromo ? appliedPromo.code : null;
+    const promoDivisor = appliedPromo ? appliedPromo.divisor : null;
     try {
-      await api("/api/invoices", { method: "POST", body: JSON.stringify({ clientId, periodStart: start, periodEnd: end, lineItems, total }) });
+      await api("/api/invoices", { method: "POST", body: JSON.stringify({ clientId, periodStart: start, periodEnd: end, lineItems, subtotal, total, promoCode, promoDivisor }) });
       closeModal();
       toast("Facture créée");
       await loadState();
@@ -1435,12 +1493,105 @@ function renderInvoiceDetail() {
             </tr>`).join("")}
           </tbody>
           <tfoot>
+            ${inv.promoCode ? `
+            <tr><td colspan="3" style="text-align:right;color:var(--ink-dim);padding:4px 10px">Sous-total</td><td class="num mono" style="color:var(--ink-dim)">${fmtUsd(inv.subtotal ?? inv.total)}</td></tr>
+            <tr><td colspan="3" style="text-align:right;color:var(--good);padding:4px 10px">Code promo ${escapeHtml(inv.promoCode)} (÷${inv.promoDivisor})</td><td class="num mono" style="color:var(--good)">-${fmtUsd((inv.subtotal ?? inv.total) - inv.total)}</td></tr>
+            ` : ""}
             <tr><td colspan="3" style="text-align:right;font-weight:650;padding:12px 10px">Total</td><td class="num mono" style="font-weight:650;font-size:15px">${fmtUsd(inv.total)}</td></tr>
           </tfoot>
         </table>
       </div>
     </div>
   `;
+}
+
+/* ---- promotions ---- */
+function renderPromotions() {
+  return `
+    <div class="pagehead">
+      <div><h1>Promotions</h1><div class="desc">Codes promo reliés à une réduction de coût (montant divisé par un diviseur défini)</div></div>
+      <button class="btn primary" id="btn-add-promotion">+ Nouvelle promotion</button>
+    </div>
+
+    <div class="card">
+      ${state.promotions.length === 0 ? `<div class="empty"><div class="big">%</div>Aucune promotion pour l'instant.</div>` : `
+      <table>
+        <thead><tr><th>Promotion</th><th class="num">Diviseur</th><th class="num">Réduction</th><th>Codes</th><th></th></tr></thead>
+        <tbody>
+          ${state.promotions.map(p => `
+            <tr>
+              <td><strong>${escapeHtml(p.name)}</strong></td>
+              <td class="num mono">÷ ${p.divisor}</td>
+              <td class="num mono">${p.divisor > 0 ? (100 - 100 / p.divisor).toFixed(1) : "0"}%</td>
+              <td>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+                  ${p.codes.map(c => `<span class="tag mono" style="display:inline-flex;align-items:center;gap:5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:2px 4px 2px 8px;font-size:12px">${escapeHtml(c.code)}<button data-del-promo-code="${c.id}" style="border:none;background:none;color:var(--ink-faint);cursor:pointer;font-size:12px;padding:2px">✕</button></span>`).join("")}
+                  <button class="btn ghost sm" data-add-promo-code="${p.id}">+ Code</button>
+                </div>
+              </td>
+              <td style="text-align:right;white-space:nowrap">
+                <button class="btn ghost sm" data-edit-promotion="${p.id}">Modifier</button>
+                <button class="btn ghost sm" data-del-promotion="${p.id}">Supprimer</button>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>`}
+    </div>
+  `;
+}
+
+function promotionModal(promotion) {
+  const isNew = !promotion;
+  openModal(`
+    <div class="mh">${isNew ? "Nouvelle promotion" : "Modifier la promotion"}</div>
+    <div class="mb">
+      <div class="field"><label>Nom</label><input id="m-promo-name" value="${isNew ? "" : escapeHtml(promotion.name)}" placeholder="Ex: Réduction fidélité"></div>
+      <div class="field">
+        <label>Diviseur</label>
+        <input id="m-promo-divisor" type="number" step="0.01" min="0.01" value="${isNew ? "2" : promotion.divisor}">
+        <div class="hint" style="color:var(--ink-faint);font-size:11.5px;margin-top:4px">Le coût est divisé par cette valeur. Ex : 2 = -50%, 4 = -75%.</div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn ghost" id="m-cancel">Annuler</button><button class="btn primary" id="m-save">Enregistrer</button></div>
+  `);
+  document.getElementById("m-cancel").onclick = closeModal;
+  document.getElementById("m-save").onclick = async () => {
+    const name = document.getElementById("m-promo-name").value.trim();
+    const divisor = parseFloat(document.getElementById("m-promo-divisor").value);
+    if (!name) { toast("Le nom est requis"); return; }
+    if (!Number.isFinite(divisor) || divisor <= 0) { toast("Le diviseur doit être un nombre supérieur à 0"); return; }
+    try {
+      if (isNew) await api("/api/promotions", { method: "POST", body: JSON.stringify({ name, divisor }) });
+      else await api("/api/promotions/" + promotion.id, { method: "PUT", body: JSON.stringify({ name, divisor }) });
+      closeModal();
+      toast(isNew ? "Promotion créée" : "Promotion mise à jour");
+      await loadState();
+    } catch (e) { toast("Erreur : " + e.message); }
+  };
+}
+
+function promoCodeModal(promotionId) {
+  openModal(`
+    <div class="mh">Ajouter un code promo</div>
+    <div class="mb">
+      <div class="field"><label>Code</label><input id="m-promo-code" placeholder="Ex: WELCOME10" style="text-transform:uppercase"></div>
+    </div>
+    <div class="mf"><button class="btn ghost" id="m-cancel">Annuler</button><button class="btn primary" id="m-save">Ajouter</button></div>
+  `);
+  document.getElementById("m-cancel").onclick = closeModal;
+  const input = document.getElementById("m-promo-code");
+  input.focus();
+  document.getElementById("m-save").onclick = async () => {
+    const code = input.value.trim();
+    if (!code) { toast("Le code est requis"); return; }
+    try {
+      await api("/api/promotions/" + promotionId + "/codes", { method: "POST", body: JSON.stringify({ code }) });
+      closeModal();
+      toast("Code ajouté");
+      await loadState();
+    } catch (e) { toast("Erreur : " + e.message); }
+  };
 }
 
 /* ---- devices ---- */
@@ -1970,6 +2121,27 @@ function wireView() {
   });
   const printInvoiceBtn = document.getElementById("btn-print-invoice");
   if (printInvoiceBtn) printInvoiceBtn.onclick = () => window.print();
+
+  const addPromotionBtn = document.getElementById("btn-add-promotion");
+  if (addPromotionBtn) addPromotionBtn.onclick = () => promotionModal(null);
+  document.querySelectorAll("[data-edit-promotion]").forEach(el => {
+    el.onclick = () => promotionModal(state.promotions.find(p => p.id === el.dataset.editPromotion));
+  });
+  document.querySelectorAll("[data-del-promotion]").forEach(el => {
+    el.onclick = async () => {
+      try { await api("/api/promotions/" + el.dataset.delPromotion, { method: "DELETE" }); toast("Promotion supprimée"); await loadState(); }
+      catch (err) { toast("Erreur : " + err.message); }
+    };
+  });
+  document.querySelectorAll("[data-add-promo-code]").forEach(el => {
+    el.onclick = () => promoCodeModal(el.dataset.addPromoCode);
+  });
+  document.querySelectorAll("[data-del-promo-code]").forEach(el => {
+    el.onclick = async () => {
+      try { await api("/api/promo-codes/" + el.dataset.delPromoCode, { method: "DELETE" }); toast("Code supprimé"); await loadState(); }
+      catch (err) { toast("Erreur : " + err.message); }
+    };
+  });
 
   document.querySelectorAll("[data-view-device]").forEach(el => {
     el.onclick = () => { state.selectedDeviceId = el.dataset.viewDevice; state.view = "device-detail"; render(); };

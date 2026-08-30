@@ -385,11 +385,65 @@ app.get("/api/state", (req, res) => {
 
   const invoices = db.prepare("SELECT * FROM invoices ORDER BY created_at DESC").all().map(i => ({
     id: i.id, clientId: i.client_id, periodStart: i.period_start, periodEnd: i.period_end,
-    status: i.status, total: i.total, lineItems: JSON.parse(i.line_items || "[]"),
+    status: i.status, subtotal: i.subtotal, total: i.total, lineItems: JSON.parse(i.line_items || "[]"),
+    promoCode: i.promo_code, promoDivisor: i.promo_divisor,
     notes: i.notes, createdAt: i.created_at, updatedAt: i.updated_at,
   }));
 
-  res.json({ clients, projects, usage, pricing, lastSync, agentLastSeen, syncRequested, devices, invoices });
+  const promotions = db.prepare("SELECT * FROM promotions ORDER BY created_at DESC").all().map(p => ({
+    id: p.id, name: p.name, divisor: p.divisor, createdAt: p.created_at,
+    codes: db.prepare("SELECT id, code FROM promo_codes WHERE promotion_id = ? ORDER BY code").all(p.id),
+  }));
+
+  res.json({ clients, projects, usage, pricing, lastSync, agentLastSeen, syncRequested, devices, invoices, promotions });
+});
+
+/* ---------------- promotions (codes promo relies a une reduction de cout, cout / diviseur) ---------------- */
+app.post("/api/promotions", (req, res) => {
+  const { name, divisor } = req.body;
+  const d = parseFloat(divisor);
+  if (!name || !name.trim()) return res.status(400).json({ error: "Le nom est requis." });
+  if (!Number.isFinite(d) || d <= 0) return res.status(400).json({ error: "Le diviseur doit etre un nombre superieur a 0." });
+  const row = { id: uid(), name: name.trim(), divisor: d, created_at: new Date().toISOString() };
+  db.prepare("INSERT INTO promotions (id, name, divisor, created_at) VALUES (@id, @name, @divisor, @created_at)").run(row);
+  res.json({ ok: true, id: row.id });
+});
+
+app.put("/api/promotions/:id", (req, res) => {
+  const { name, divisor } = req.body;
+  const existing = db.prepare("SELECT * FROM promotions WHERE id = ?").get(req.params.id);
+  if (!existing) return res.status(404).json({ error: "Promotion introuvable." });
+  const d = divisor !== undefined ? parseFloat(divisor) : existing.divisor;
+  if (!Number.isFinite(d) || d <= 0) return res.status(400).json({ error: "Le diviseur doit etre un nombre superieur a 0." });
+  db.prepare("UPDATE promotions SET name = @name, divisor = @divisor WHERE id = @id")
+    .run({ id: req.params.id, name: (name || existing.name).trim(), divisor: d });
+  res.json({ ok: true });
+});
+
+app.delete("/api/promotions/:id", (req, res) => {
+  const tx = db.transaction(() => {
+    db.prepare("DELETE FROM promo_codes WHERE promotion_id = ?").run(req.params.id);
+    db.prepare("DELETE FROM promotions WHERE id = ?").run(req.params.id);
+  });
+  tx();
+  res.json({ ok: true });
+});
+
+app.post("/api/promotions/:id/codes", (req, res) => {
+  const promotion = db.prepare("SELECT id FROM promotions WHERE id = ?").get(req.params.id);
+  if (!promotion) return res.status(404).json({ error: "Promotion introuvable." });
+  const code = (req.body.code || "").trim().toUpperCase();
+  if (!code) return res.status(400).json({ error: "Le code est requis." });
+  const dupe = db.prepare("SELECT id FROM promo_codes WHERE code = ?").get(code);
+  if (dupe) return res.status(400).json({ error: "Ce code existe deja." });
+  const row = { id: uid(), code, promotion_id: req.params.id, created_at: new Date().toISOString() };
+  db.prepare("INSERT INTO promo_codes (id, code, promotion_id, created_at) VALUES (@id, @code, @promotion_id, @created_at)").run(row);
+  res.json({ ok: true, id: row.id });
+});
+
+app.delete("/api/promo-codes/:id", (req, res) => {
+  db.prepare("DELETE FROM promo_codes WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
 });
 
 app.put("/api/devices/:id", (req, res) => {
@@ -487,34 +541,37 @@ app.delete("/api/projects/:id", (req, res) => {
 
 /* ---------------- factures (facturation virtuelle factice) ---------------- */
 app.post("/api/invoices", (req, res) => {
-  const { clientId, periodStart, periodEnd, lineItems, total, notes } = req.body;
+  const { clientId, periodStart, periodEnd, lineItems, subtotal, total, promoCode, promoDivisor, notes } = req.body;
   if (!clientId) return res.status(400).json({ error: "Client requis." });
   if (!Array.isArray(lineItems) || lineItems.length === 0) return res.status(400).json({ error: "Au moins une ligne est requise." });
   const now = new Date().toISOString();
   const row = {
     id: uid(), client_id: clientId, period_start: periodStart || "", period_end: periodEnd || "",
-    status: "draft", total: total || 0, line_items: JSON.stringify(lineItems || []),
+    status: "draft", subtotal: subtotal !== undefined ? subtotal : (total || 0), total: total || 0,
+    line_items: JSON.stringify(lineItems || []),
+    promo_code: promoCode || null, promo_divisor: promoDivisor || null,
     notes: notes || null, created_at: now, updated_at: now,
   };
-  db.prepare(`INSERT INTO invoices (id, client_id, period_start, period_end, status, total, line_items, notes, created_at, updated_at)
-    VALUES (@id, @client_id, @period_start, @period_end, @status, @total, @line_items, @notes, @created_at, @updated_at)`).run(row);
+  db.prepare(`INSERT INTO invoices (id, client_id, period_start, period_end, status, subtotal, total, line_items, promo_code, promo_divisor, notes, created_at, updated_at)
+    VALUES (@id, @client_id, @period_start, @period_end, @status, @subtotal, @total, @line_items, @promo_code, @promo_divisor, @notes, @created_at, @updated_at)`).run(row);
   res.json({ ok: true, id: row.id });
 });
 
 app.put("/api/invoices/:id", (req, res) => {
-  const { status, lineItems, total, notes } = req.body;
+  const { status, lineItems, subtotal, total, notes } = req.body;
   const now = new Date().toISOString();
   const existing = db.prepare("SELECT * FROM invoices WHERE id = ?").get(req.params.id);
   if (!existing) return res.status(404).json({ error: "Facture introuvable." });
   const row = {
     id: req.params.id,
     status: status || existing.status,
+    subtotal: subtotal !== undefined ? subtotal : existing.subtotal,
     total: total !== undefined ? total : existing.total,
     line_items: lineItems !== undefined ? JSON.stringify(lineItems) : existing.line_items,
     notes: notes !== undefined ? notes : existing.notes,
     updated_at: now,
   };
-  db.prepare(`UPDATE invoices SET status=@status, total=@total, line_items=@line_items, notes=@notes, updated_at=@updated_at WHERE id=@id`).run(row);
+  db.prepare(`UPDATE invoices SET status=@status, subtotal=@subtotal, total=@total, line_items=@line_items, notes=@notes, updated_at=@updated_at WHERE id=@id`).run(row);
   res.json({ ok: true });
 });
 
