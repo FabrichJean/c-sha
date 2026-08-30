@@ -28,20 +28,21 @@ jobs:
         run: python -m pip install --upgrade pip pyinstaller
 
       - name: Build binary
+        working-directory: agent
         run: python -m PyInstaller --onefile --name ledger-agent ledger_agent.py
 
       - name: Rename binary (Unix)
         if: runner.os != 'Windows'
-        run: mv dist/ledger-agent dist/${{ matrix.asset_name }}
+        run: mv agent/dist/ledger-agent agent/dist/${{ matrix.asset_name }}
 
       - name: Rename binary (Windows)
         if: runner.os == 'Windows'
-        run: mv dist/ledger-agent.exe dist/${{ matrix.asset_name }}
+        run: mv agent/dist/ledger-agent.exe agent/dist/${{ matrix.asset_name }}
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: dist/${{ matrix.asset_name }}
+          path: agent/dist/${{ matrix.asset_name }}
 
   release:
     needs: build

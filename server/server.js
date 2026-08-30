@@ -18,10 +18,17 @@ app.use(express.json({ limit: "10mb" }));
 app.use(require("./routes/sync"));
 app.use(require("./routes/device-view"));
 
-/* la page elle-meme doit rester accessible sans Basic Auth (le token dans l'URL
-   est la seule protection voulue pour ce lien de partage) */
+/* la page elle-meme, et ses assets (CSS/JS extraits), doivent rester
+   accessibles sans Basic Auth (le token dans l'URL est la seule protection
+   voulue pour ce lien de partage) */
 app.get("/device.html", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "device.html"));
+});
+app.get("/device-style.css", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "device-style.css"));
+});
+app.get("/device-app.js", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "device-app.js"));
 });
 
 /* ---------------- tout le reste derriere Basic Auth ---------------- */
