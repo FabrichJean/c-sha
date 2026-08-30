@@ -883,6 +883,7 @@ function renderDeviceDetail() {
       </div>
       <div style="display:flex;gap:8px">
         ${device.id !== "legacy" ? `<button class="btn" id="btn-refresh-device" data-refresh-device="${device.id}" ${state.deviceRefreshing ? "disabled" : ""}>${state.deviceRefreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir"}</button>` : ""}
+        ${device.id !== "legacy" ? `<button class="btn" data-share-device="${device.id}">⇗ Lien de partage</button>` : ""}
         ${device.id !== "legacy" ? `<button class="btn" data-rename-device="${device.id}">Renommer</button>` : ""}
       </div>
     </div>
@@ -1048,7 +1049,7 @@ function renderDevices() {
               <td class="num mono">${fmtCompact(d.tokens)}</td>
               <td class="num mono">${fmtUsd(d.cost)}</td>
               <td style="text-align:right;white-space:nowrap">
-                ${d.id !== "legacy" ? `<button class="btn ghost sm" data-rename-device="${d.id}">Renommer</button> <button class="btn ghost sm" data-del-device="${d.id}">Supprimer</button>` : ""}
+                ${d.id !== "legacy" ? `<button class="btn ghost sm" data-share-device="${d.id}">⇗ Partager</button> <button class="btn ghost sm" data-rename-device="${d.id}">Renommer</button> <button class="btn ghost sm" data-del-device="${d.id}">Supprimer</button>` : ""}
               </td>
             </tr>`;
           }).join("")}
@@ -1461,6 +1462,12 @@ function wireView() {
       catch (err) { toast("Erreur : " + err.message); }
     };
   });
+  document.querySelectorAll("[data-share-device]").forEach(el => {
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      const device = state.devices.find(d => d.id === el.dataset.shareDevice);
+      if (!device || !device.viewToken) { toast("Lien indisponible"); return; }
+      const url = `${location.origin}/device.html?id=${encodeURIComponent(device.id)}&token=${encodeURIComponent(device.viewToken)}`;
 
   const importManualBtn = document.getElementById("btn-import-manual");
   if (importManualBtn) importManualBtn.onclick = handleImportManual;
