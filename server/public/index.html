@@ -1112,7 +1112,7 @@ function renderInvoices() {
 
 function invoiceModal() {
   const clientOptions = state.clients.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("");
-  let extraDeviceIds = [];
+  let deviceLines = []; // {id, amount}
   let customLines = []; // {id, label, amount}
 
   openModal(`
@@ -1149,23 +1149,27 @@ function invoiceModal() {
     const devicesEl = document.getElementById("m-inv-devices");
     if (!clientId) { devicesEl.innerHTML = ""; return; }
     const { start, end } = currentPeriod();
-    const available = state.devices.filter(d => d.id !== "legacy" && !extraDeviceIds.includes(d.id));
-    const rowsHtml = extraDeviceIds.map(id => {
-      const device = state.devices.find(d => d.id === id);
+    const available = state.devices.filter(d => d.id !== "legacy" && !deviceLines.some(dl => dl.id === d.id));
+    const rowsHtml = deviceLines.map(dl => {
+      const device = state.devices.find(d => d.id === dl.id);
       if (!device) return "";
-      const { tokens, cost } = computeTokenCostForDevice(id, start, end);
+      const { tokens, cost } = computeTokenCostForDevice(dl.id, start, end);
       return `<tr>
         <td>${escapeHtml(device.name)}</td>
         <td class="hint">Appareil</td>
         <td class="num mono">${fmtCompact(tokens)} tok</td>
-        <td class="num mono" id="m-line-amount-device-${id}" data-fixed-amount="${cost}">${fmtUsd(cost)}</td>
-        <td style="text-align:right"><button class="btn ghost sm" data-remove-device-line="${id}">✕</button></td>
+        <td>
+          <input type="number" step="0.01" min="0" max="${cost}" value="${dl.amount}" data-device-amount="${dl.id}" style="width:90px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)">
+          <div class="hint" style="color:var(--ink-faint);font-size:10.5px;margin-top:2px;text-align:right">sur ${fmtUsd(cost)}</div>
+        </td>
+        <td style="text-align:right"><button class="btn ghost sm" data-remove-device-line="${dl.id}">✕</button></td>
       </tr>`;
     }).join("");
     devicesEl.innerHTML = `
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
         <label style="font-size:12px;font-weight:600;color:var(--ink-dim)">Appareils facturés (conso totale, hors projets)</label>
-        ${extraDeviceIds.length ? `<table style="margin-top:8px"><tbody>${rowsHtml}</tbody></table>` : `<div class="hint" style="color:var(--ink-faint);padding:8px 0;font-size:12.5px">Aucun appareil ajouté.</div>`}
+        <div class="hint" style="color:var(--ink-faint);font-size:11.5px;margin:2px 0 8px">Le montant est pré-rempli avec le coût total de l'appareil — réduis-le pour n'en facturer qu'une partie.</div>
+        ${deviceLines.length ? `<table style="margin-top:8px"><thead><tr><th>Appareil</th><th>Mode</th><th class="num">Tokens</th><th class="num">Montant</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>` : `<div class="hint" style="color:var(--ink-faint);padding:8px 0;font-size:12.5px">Aucun appareil ajouté.</div>`}
         ${available.length ? `
         <div style="display:flex;gap:8px;margin-top:8px">
           <select id="m-inv-device-select" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink)">
@@ -1174,13 +1178,27 @@ function invoiceModal() {
           <button class="btn sm" id="btn-add-device-line">+ Ajouter</button>
         </div>` : ""}
       </div>`;
+    devicesEl.querySelectorAll("[data-device-amount]").forEach(input => {
+      input.oninput = () => {
+        const dl = deviceLines.find(x => x.id === input.dataset.deviceAmount);
+        if (!dl) return;
+        const cap = computeTokenCostForDevice(dl.id, start, end).cost;
+        let amount = parseFloat(input.value) || 0;
+        if (amount > cap) { amount = cap; input.value = cap.toFixed(2); }
+        dl.amount = amount;
+        updateTotal();
+      };
+    });
     devicesEl.querySelectorAll("[data-remove-device-line]").forEach(btn => {
-      btn.onclick = () => { extraDeviceIds = extraDeviceIds.filter(id => id !== btn.dataset.removeDeviceLine); renderDeviceSection(); updateTotal(); };
+      btn.onclick = () => { deviceLines = deviceLines.filter(dl => dl.id !== btn.dataset.removeDeviceLine); renderDeviceSection(); updateTotal(); };
     });
     const addBtn = document.getElementById("btn-add-device-line");
     if (addBtn) addBtn.onclick = () => {
       const sel = document.getElementById("m-inv-device-select");
-      if (sel.value) extraDeviceIds.push(sel.value);
+      if (sel.value) {
+        const cost = computeTokenCostForDevice(sel.value, start, end).cost;
+        deviceLines.push({ id: sel.value, amount: cost });
+      }
       renderDeviceSection();
       updateTotal();
     };
@@ -1190,56 +1208,25 @@ function invoiceModal() {
     const { clientId } = currentLines();
     const customEl = document.getElementById("m-inv-custom");
     if (!clientId) { customEl.innerHTML = ""; return; }
-    const { start, end } = currentPeriod();
-    const deviceOptions = state.devices.filter(d => d.id !== "legacy");
-    const rowsHtml = customLines.map(line => {
-      const cap = line.deviceId ? computeTokenCostForDevice(line.deviceId, start, end).cost : null;
-      return `<tr>
-        <td><input type="text" value="${escapeHtml(line.label)}" placeholder="Description" data-custom-label="${line.id}" style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 8px;background:var(--bg);color:var(--ink)"></td>
-        <td>
-          <select data-custom-device="${line.id}" style="width:100%;padding:5px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg);color:var(--ink);font-size:12.5px">
-            <option value="">— montant libre —</option>
-            ${deviceOptions.map(d => `<option value="${d.id}" ${line.deviceId === d.id ? "selected" : ""}>${escapeHtml(d.name)}</option>`).join("")}
-          </select>
-          ${cap !== null ? `<div class="hint" style="color:var(--ink-faint);font-size:11px;margin-top:2px">plafond : ${fmtUsd(cap)}</div>` : ""}
-        </td>
-        <td class="num"><input type="number" step="0.01" ${cap !== null ? `max="${cap}"` : ""} value="${line.amount}" class="m-custom-amount" data-custom-amount="${line.id}" style="width:90px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:5px 8px;background:var(--bg);color:var(--ink)"></td>
-        <td style="text-align:right"><button class="btn ghost sm" data-remove-custom-line="${line.id}">✕</button></td>
-      </tr>`;
-    }).join("");
+    const rowsHtml = customLines.map(line => `<tr>
+      <td><input type="text" value="${escapeHtml(line.label)}" placeholder="Description" data-custom-label="${line.id}" style="width:100%;border:1px solid var(--border);border-radius:5px;padding:5px 8px;background:var(--bg);color:var(--ink)"></td>
+      <td class="num"><input type="number" step="0.01" value="${line.amount}" data-custom-amount="${line.id}" style="width:90px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:5px 8px;background:var(--bg);color:var(--ink)"></td>
+      <td style="text-align:right"><button class="btn ghost sm" data-remove-custom-line="${line.id}">✕</button></td>
+    </tr>`).join("");
     customEl.innerHTML = `
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
         <label style="font-size:12px;font-weight:600;color:var(--ink-dim)">Montant personnalisé</label>
-        <div class="hint" style="color:var(--ink-faint);font-size:11.5px;margin:2px 0 8px">Rattache une ligne à un appareil pour plafonner le montant à son coût total sur la période — pratique pour n'en facturer qu'une partie.</div>
-        ${customLines.length ? `<table style="margin-top:8px"><thead><tr><th>Description</th><th>Plafonner à</th><th class="num">Montant</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>` : `<div class="hint" style="color:var(--ink-faint);padding:8px 0;font-size:12.5px">Aucune ligne personnalisée.</div>`}
+        <div class="hint" style="color:var(--ink-faint);font-size:11.5px;margin:2px 0 8px">Pour un montant qui ne vient ni d'un projet ni d'un appareil (forfait, ajustement…).</div>
+        ${customLines.length ? `<table style="margin-top:8px"><thead><tr><th>Description</th><th class="num">Montant</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>` : `<div class="hint" style="color:var(--ink-faint);padding:8px 0;font-size:12.5px">Aucune ligne personnalisée.</div>`}
         <button class="btn sm" id="btn-add-custom-line" style="margin-top:8px">+ Ajouter une ligne</button>
       </div>`;
     customEl.querySelectorAll("[data-custom-label]").forEach(input => {
       input.oninput = () => { const line = customLines.find(l => l.id === input.dataset.customLabel); if (line) line.label = input.value; };
     });
-    customEl.querySelectorAll("[data-custom-device]").forEach(select => {
-      select.onchange = () => {
-        const line = customLines.find(l => l.id === select.dataset.customDevice);
-        if (!line) return;
-        line.deviceId = select.value || null;
-        if (line.deviceId) {
-          const cap = computeTokenCostForDevice(line.deviceId, start, end).cost;
-          if (line.amount > cap) line.amount = cap;
-        }
-        renderCustomSection();
-        updateTotal();
-      };
-    });
     customEl.querySelectorAll("[data-custom-amount]").forEach(input => {
       input.oninput = () => {
         const line = customLines.find(l => l.id === input.dataset.customAmount);
-        if (!line) return;
-        let amount = parseFloat(input.value) || 0;
-        if (line.deviceId) {
-          const cap = computeTokenCostForDevice(line.deviceId, start, end).cost;
-          if (amount > cap) { amount = cap; input.value = cap.toFixed(2); }
-        }
-        line.amount = amount;
+        if (line) line.amount = parseFloat(input.value) || 0;
         updateTotal();
       };
     });
@@ -1248,7 +1235,7 @@ function invoiceModal() {
     });
     const addBtn = document.getElementById("btn-add-custom-line");
     if (addBtn) addBtn.onclick = () => {
-      customLines.push({ id: "c" + Date.now() + Math.random().toString(36).slice(2, 6), label: "", amount: 0, deviceId: null });
+      customLines.push({ id: "c" + Date.now() + Math.random().toString(36).slice(2, 6), label: "", amount: 0 });
       renderCustomSection();
       updateTotal();
     };
@@ -1309,13 +1296,15 @@ function invoiceModal() {
 
   function updateTotal() {
     const fixed = [...document.querySelectorAll("[id^='m-line-amount-']")].map(el => parseFloat(el.dataset.fixedAmount) || 0);
+    const devices = deviceLines.reduce((s, dl) => s + (dl.amount || 0), 0);
     const custom = customLines.reduce((s, l) => s + (l.amount || 0), 0);
-    document.getElementById("m-inv-total").textContent = fmtUsd(fixed.reduce((a, b) => a + b, 0) + custom);
+    document.getElementById("m-inv-total").textContent = fmtUsd(fixed.reduce((a, b) => a + b, 0) + devices + custom);
   }
 
   function onClientChange() {
     const { clientId } = currentLines();
-    extraDeviceIds = state.devices.filter(d => d.clientId === clientId).map(d => d.id);
+    const { start, end } = currentPeriod();
+    deviceLines = state.devices.filter(d => d.clientId === clientId).map(d => ({ id: d.id, amount: computeTokenCostForDevice(d.id, start, end).cost }));
     customLines = [];
     renderProjectLines();
     renderDeviceSection();
@@ -1323,6 +1312,11 @@ function invoiceModal() {
     updateTotal();
   }
   function onMonthChange() {
+    const { start, end } = currentPeriod();
+    deviceLines.forEach(dl => {
+      const cap = computeTokenCostForDevice(dl.id, start, end).cost;
+      if (dl.amount > cap) dl.amount = cap;
+    });
     renderProjectLines();
     renderDeviceSection();
     renderCustomSection();
@@ -1345,20 +1339,16 @@ function invoiceModal() {
       const { tokens } = computeTokenCostForProject(p, start, end);
       return { projectId: p.id, projectName: p.name, billingMode: "tokens", tokens, amount };
     });
-    const deviceLines = extraDeviceIds.map(id => {
-      const device = state.devices.find(d => d.id === id);
-      const { tokens, cost } = computeTokenCostForDevice(id, start, end);
-      return { deviceId: id, projectName: device ? device.name : id, billingMode: "device", tokens, amount: cost };
+    const deviceLineItems = deviceLines.map(dl => {
+      const device = state.devices.find(d => d.id === dl.id);
+      const { tokens, cost } = computeTokenCostForDevice(dl.id, start, end);
+      const partial = dl.amount < cost - 0.005;
+      return { deviceId: dl.id, projectName: device ? device.name : dl.id, billingMode: "device", tokens, amount: dl.amount, partial };
     });
-    const manualLines = customLines.filter(l => l.amount || l.label).map(l => {
-      const cap = l.deviceId ? computeTokenCostForDevice(l.deviceId, start, end).cost : null;
-      const deviceName = l.deviceId ? (state.devices.find(d => d.id === l.deviceId) || {}).name : null;
-      return {
-        projectName: l.label.trim() || "Montant personnalisé", billingMode: "custom", amount: l.amount || 0,
-        deviceId: l.deviceId || null, deviceName, deviceCap: cap,
-      };
-    });
-    const lineItems = [...projectLines, ...deviceLines, ...manualLines];
+    const manualLines = customLines.filter(l => l.amount || l.label).map(l => ({
+      projectName: l.label.trim() || "Montant personnalisé", billingMode: "custom", amount: l.amount || 0,
+    }));
+    const lineItems = [...projectLines, ...deviceLineItems, ...manualLines];
     if (!clientId || lineItems.length === 0) { toast("Ajoute au moins un projet, un appareil ou un montant"); return; }
     const total = lineItems.reduce((s, l) => s + l.amount, 0);
     try {
@@ -1409,7 +1399,7 @@ function renderInvoiceDetail() {
             ${inv.lineItems.map(l => `<tr>
               <td>${escapeHtml(l.projectName)}</td>
               <td class="hint">${l.billingMode === "hourly" ? "Taux horaire" : l.billingMode === "device" ? "Appareil" : l.billingMode === "custom" ? "Montant libre" : "Coût tokens"}</td>
-              <td class="num mono">${l.billingMode === "hourly" ? `${l.hours} h × $${l.rate}` : l.billingMode === "custom" ? (l.deviceId ? `sur ${fmtUsd(l.deviceCap)} (${escapeHtml(l.deviceName || "appareil")})` : "—") : `${fmtCompact(l.tokens)} tok`}</td>
+              <td class="num mono">${l.billingMode === "hourly" ? `${l.hours} h × $${l.rate}` : l.billingMode === "custom" ? "—" : l.partial ? "—" : `${fmtCompact(l.tokens)} tok`}</td>
               <td class="num mono">${fmtUsd(l.amount)}</td>
             </tr>`).join("")}
           </tbody>
