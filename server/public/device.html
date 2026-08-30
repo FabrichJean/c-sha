@@ -356,15 +356,17 @@ function refreshBanner() {
 const INVOICE_STATUS_LABELS = { draft: "Brouillon", sent: "Envoyée", paid: "Payée" };
 const INVOICE_STATUS_COLORS = { draft: "var(--ink-faint)", sent: "var(--warn)", paid: "var(--good)" };
 
-function buildBillingCard() {
+function buildBillingCard(deviceTotalCost) {
   const b = state.data.billing;
   if (!b || b.entries.length === 0) return "";
+  const remaining = deviceTotalCost - b.totalPaid;
   return `
     <div class="card">
       <div class="trend-head"><h3>Facturation de cet appareil</h3></div>
       <div class="card-body">
+        <div class="hint" style="color:var(--ink-faint);font-size:11.5px;margin-bottom:10px">Le restant est calculé sur le coût réel de l'appareil, pas seulement sur ce qui a été facturé — utile quand une facture ne couvre qu'une partie du coût.</div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px">
-          <div><div class="il">Total facturé</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px">${fmtUsd(b.totalBilled)}</div></div>
+          <div><div class="il">Coût total (appareil)</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px">${fmtUsd(deviceTotalCost)}</div></div>
           <div><div class="il">Payé</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px;color:var(--good)">${fmtUsd(b.totalPaid)}</div></div>
           <div><div class="il">Restant</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px;color:${b.totalPending > 0 ? "var(--warn)" : "var(--ink-faint)"}">${fmtUsd(b.totalPending)}</div></div>
         </div>
