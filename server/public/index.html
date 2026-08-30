@@ -112,6 +112,38 @@
   .tile .value.accent { color: var(--accent); }
   .tile .value.violet { color: var(--violet); }
 
+  /* ---- widget cards ---- */
+  .widget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .widget { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); padding: 16px 16px 4px; display: flex; flex-direction: column; }
+  .widget-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+  .widget-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; color: #fff; flex-shrink: 0; }
+  .widget-badge { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 650; font-family: "IBM Plex Mono", monospace; }
+  .widget-badge.up { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .widget-badge.down { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+  .widget-badge.flat { background: var(--surface-2); color: var(--ink-faint); }
+  .widget-title { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); font-weight: 700; margin-bottom: 12px; }
+  .widget-periods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--bg); border-radius: 10px; padding: 12px 4px; margin-bottom: 4px; }
+  .widget-periods .p { text-align: center; padding: 0 4px; }
+  .widget-periods .p + .p { border-left: 1px solid var(--border); }
+  .widget-periods .p-label { font-size: 10.5px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .04em; }
+  .widget-periods .p-value { font-size: 18px; font-weight: 650; font-family: "IBM Plex Mono", monospace; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .widget-periods .p-sub { font-size: 10.5px; margin-top: 2px; font-family: "IBM Plex Mono", monospace; color: var(--ink-faint); }
+  .widget-breakdown { display: flex; flex-direction: column; }
+  .widget-row { display: flex; align-items: center; gap: 10px; padding: 11px 4px; border-top: 1px solid var(--border); }
+  .widget-row .w-dot { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
+  .widget-row .w-label { font-size: 12.5px; color: var(--ink-dim); flex: 1; }
+  .widget-row .w-value { font-size: 13px; font-weight: 620; font-family: "IBM Plex Mono", monospace; text-align: right; }
+  .widget-row .w-sub { font-size: 10.5px; color: var(--ink-faint); text-align: right; font-family: "IBM Plex Mono", monospace; margin-top: 1px; }
+  .widget-empty-row { padding: 14px 4px; border-top: 1px solid var(--border); font-size: 12px; color: var(--ink-faint); text-align: center; }
+  .widget.stat { justify-content: space-between; min-height: 168px; }
+  .widget.stat .stat-desc { font-size: 12px; color: var(--ink-dim); margin-top: 2px; line-height: 1.4; }
+  .widget.stat .stat-big { font-size: 34px; font-weight: 700; font-family: "IBM Plex Mono", monospace; margin: 14px 0 6px; }
+  .widget.stat .stat-foot { font-size: 12px; color: var(--ink-faint); padding-bottom: 14px; }
+  .widget-live { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 650; padding: 3px 9px; border-radius: 999px; }
+  .widget-live.on { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+  .widget-live.off { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+  .widget-live .w-pulse { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 22px; overflow: hidden; }
   .card .card-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
   .card .card-head h3 { font-size: 14px; font-weight: 620; }
@@ -226,7 +258,41 @@ function fmtCompact(n) {
 function fmtUsd(n) { if (n === undefined || n === null || isNaN(n)) return "–"; return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function modelLabel(model) { return model ? model.replace("claude-", "") : "?"; }
+function colorForModel(model) {
+  const cls = model ? modelLabel(model) : "";
+  if (/opus|fable|mythos/.test(model || "")) return "var(--violet)";
+  if (/sonnet/.test(model || "")) return "var(--accent)";
+  if (/haiku/.test(model || "")) return "var(--warn)";
+  return "var(--ink-faint)";
+}
+function pctChange(today, yesterday) {
+  if (!yesterday) return today > 0 ? 100 : 0;
+  return ((today - yesterday) / yesterday) * 100;
+}
 
+/* ---------------- widget cards (style "SaaS analytics") ---------------- */
+function widgetBadge(pct) {
+  if (pct === null || pct === undefined) return "";
+  const cls = pct > 0.5 ? "up" : pct < -0.5 ? "down" : "flat";
+  const arrow = pct > 0.5 ? "↑" : pct < -0.5 ? "↓" : "→";
+  return `<span class="widget-badge ${cls}">${arrow} ${Math.abs(pct).toFixed(0)}%</span>`;
+}
+
+function widget({ icon, iconBg, badgePct, title, periods, breakdown, breakdownEmptyLabel }) {
+  const periodsHtml = periods.map(p => `
+    <div class="p">
+      <div class="p-label">${escapeHtml(p.label)}</div>
+      <div class="p-value">${p.value}</div>
+      ${p.sub !== undefined ? `<div class="p-sub">${p.sub}</div>` : ""}
+    </div>`).join("");
+
+  const rowsHtml = (breakdown && breakdown.length)
+    ? breakdown.map(b => `
+      <div class="widget-row">
+        <span class="w-dot" style="background:${b.color}"></span>
+        <span class="w-label">${escapeHtml(b.label)}</span>
+        <div>
+          <div class="w-value">${b.value}</div>
 function pricingFor(model) {
   const p = state.pricing || DEFAULT_PRICING;
   return p.models[model] || p.fallback || DEFAULT_PRICING.fallback;

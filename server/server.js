@@ -155,8 +155,10 @@ app.get("/api/state", (req, res) => {
   const lastSyncRow = db.prepare("SELECT value FROM settings WHERE key = 'last_sync'").get();
   const lastSync = lastSyncRow ? JSON.parse(lastSyncRow.value) : null;
   const agentSeenRow = db.prepare("SELECT value FROM settings WHERE key = 'agent_last_seen'").get();
+  const agentLastSeen = agentSeenRow ? JSON.parse(agentSeenRow.value) : null;
+  const syncRequested = getSyncRequest();
 
-  res.json({ clients, projects, usage, pricing, lastSync });
+  res.json({ clients, projects, usage, pricing, lastSync, agentLastSeen, syncRequested });
 });
 
 /* le bouton "Rafraichir" du CRM appelle ceci pour demander une synchro immediate */
