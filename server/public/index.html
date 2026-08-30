@@ -232,10 +232,69 @@
   .activity-row .a-time { font-size: 11px; color: var(--ink-faint); text-align: right; white-space: nowrap; margin-left: 10px; min-width: 72px; }
 
   /* ---- docs page ---- */
-  .docs-steps { margin: 0; padding-left: 20px; color: var(--ink-dim); line-height: 1.8; }
-  .docs-steps li { margin-bottom: 12px; }
-  .docs-steps li:last-child { margin-bottom: 0; }
-  .docs-pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; overflow-x: auto; margin: 8px 0 0; }
+  .docs-breadcrumb { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: var(--ink-faint); margin-bottom: 18px; }
+  .docs-breadcrumb > span > span { margin: 0 6px; }
+  .docs-print-btn { display: inline-flex; align-items: center; gap: 6px; }
+  .docs-layout { display: grid; grid-template-columns: 1fr 260px; gap: 32px; align-items: start; }
+  .docs-title { font-size: 28px; font-weight: 700; line-height: 1.25; margin-bottom: 10px; }
+  .docs-subtitle { color: var(--ink-dim); font-size: 14px; line-height: 1.6; margin: 0 0 20px; max-width: 640px; }
+  .docs-p { color: var(--ink-dim); margin: 0; line-height: 1.7; }
+  .docs-list { margin: 0; padding-left: 18px; color: var(--ink-dim); line-height: 1.9; }
+
+  .docs-callout { display: flex; gap: 12px; align-items: flex-start; border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; font-size: 13px; }
+  .docs-callout.success { background: var(--accent-soft); color: var(--accent); }
+  .docs-callout.success > div { color: var(--ink); }
+  .docs-callout.success div div { color: var(--ink-dim); margin-top: 2px; font-weight: 400; }
+  .docs-callout.info { background: var(--surface-2); color: var(--ink-dim); margin: 16px 0 0; }
+  .docs-callout-icon { flex-shrink: 0; margin-top: 1px; }
+
+  .docs-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px; margin-bottom: 18px; }
+  .docs-section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .docs-section-head h2 { font-size: 15.5px; font-weight: 650; white-space: nowrap; }
+  .docs-num { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; }
+  .docs-pill { font-size: 11px; color: var(--ink-faint); background: var(--surface-2); border-radius: 20px; padding: 3px 10px; white-space: nowrap; }
+  .docs-section-rule { flex: 1; height: 1px; background: var(--border); }
+
+  .docs-item { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--border); }
+  .docs-item:first-of-type { border-top: none; padding-top: 0; }
+  .docs-item-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; }
+  .docs-item-title { font-size: 13.5px; font-weight: 650; margin-bottom: 3px; }
+  .docs-item-desc { font-size: 13px; color: var(--ink-dim); line-height: 1.7; }
+
+  .docs-os-tabs button { display: inline-flex; align-items: center; gap: 7px; }
+
+  .docs-steps { display: flex; flex-direction: column; gap: 16px; }
+  .docs-step { display: flex; gap: 12px; align-items: flex-start; }
+  .docs-step-num { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: var(--surface-2); color: var(--ink-dim); display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 700; margin-top: 1px; }
+  .docs-step-body { color: var(--ink-dim); line-height: 1.7; font-size: 13.5px; flex: 1; min-width: 0; }
+  .docs-code-wrap { position: relative; margin-top: 8px; }
+  .docs-pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; padding-right: 90px; overflow-x: auto; margin: 0; font-size: 12.5px; }
+  .docs-copy-btn { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; font-size: 11px; color: var(--ink-dim); cursor: pointer; }
+  .docs-copy-btn:hover { color: var(--ink); }
+
+  .docs-status-pill { display: inline-flex; align-items: center; gap: 10px; background: var(--surface-2); border-radius: 10px; padding: 10px 16px; font-size: 13px; }
+  .docs-status-pill .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); }
+  .docs-status-pill.on .dot { background: var(--good); }
+  .docs-status-sub { color: var(--ink-faint); font-size: 12px; margin-left: 4px; }
+
+  .docs-aside { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .docs-aside-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; font-size: 12.5px; }
+  .docs-aside-card.accent { background: var(--accent-soft); border-color: transparent; }
+  .docs-aside-card.accent .docs-aside-icon, .docs-aside-card.accent .docs-aside-title { color: var(--accent); }
+  .docs-aside-icon { display: inline-flex; color: var(--ink-dim); margin-bottom: 8px; }
+  .docs-aside-title { font-weight: 650; font-size: 13px; margin-bottom: 6px; }
+  .docs-aside-card p { margin: 0; color: var(--ink-dim); line-height: 1.6; }
+  .docs-aside-card.accent p { color: var(--ink); opacity: .85; }
+  .docs-aside-btn { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 620; color: var(--accent); }
+  .docs-toc { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .docs-toc a { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-radius: 7px; color: var(--ink-dim); font-size: 12.5px; text-decoration: none; }
+  .docs-toc a:hover { background: var(--surface-2); color: var(--ink); }
+  .docs-toc a span { flex-shrink: 0; width: 18px; height: 18px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: var(--ink-dim); }
+
+  @media (max-width: 900px) {
+    .docs-layout { grid-template-columns: 1fr; }
+    .docs-aside { position: static; }
+  }
 
   /* ---- invoice sheet (print-style facture, cf. server/docs/facture_template*.html) ---- */
   .invoice-sheet-wrap { display: flex; justify-content: center; }
@@ -287,9 +346,14 @@
   .invoice-sheet .footer-note { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--sheet-muted); letter-spacing: .02em; }
 
   @media print {
-    body * { visibility: hidden; }
-    .invoice-sheet, .invoice-sheet * { visibility: visible; }
-    .invoice-sheet { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; border: none; padding: 0; }
+    nav.sidebar { display: none !important; }
+    main { padding: 0; max-width: 100%; }
+    body.print-isolate * { visibility: hidden; }
+    body.print-isolate .invoice-sheet, body.print-isolate .invoice-sheet * { visibility: visible; }
+    body.print-isolate .invoice-sheet { position: absolute; left: 0; top: 0; width: 100%; max-width: 100%; border: none; padding: 0; }
+    .docs-print-btn { display: none !important; }
+    .docs-aside { position: static; }
+    .docs-copy-btn { display: none !important; }
   }
 
   @media (max-width: 560px) {
@@ -677,6 +741,7 @@ function render() {
   const main = document.getElementById("main");
   const activeNavView = state.view === "device-detail" ? "devices" : state.view === "invoice-detail" ? "invoices" : state.view;
   document.querySelectorAll(".navitem").forEach(b => b.classList.toggle("active", b.dataset.view === activeNavView));
+  document.body.classList.toggle("print-isolate", state.view === "invoice-detail");
   if (!state.loaded) { main.innerHTML = `<div class="empty">Chargement…</div>`; return; }
   if (state.view === "dashboard") main.innerHTML = renderDashboard();
   else if (state.view === "clients") main.innerHTML = renderClients();
@@ -1818,77 +1883,86 @@ function deviceModal(device) {
 
 /* ---- contenu des instructions d'installation, par OS x avec/sans Python ---- */
 const DOCS_REPO_RAW = "https://raw.githubusercontent.com/FabrichJean/c-sha/main";
-function docsInstallSteps(os, pythonMode) {
+
+/* ---- petites icones inline (aucune dependance externe) ---- */
+const DOCS_ICONS = {
+  globe: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/></svg>`,
+  key: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M15.5 7.5l2 2M18.5 4.5l2 2"/></svg>`,
+  shield: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6l7-3z"/></svg>`,
+  help: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.3 9.2a2.7 2.7 0 1 1 3.8 2.4c-.9.4-1.1 1-1.1 1.9"/><circle cx="12" cy="17.2" r=".7" fill="currentColor" stroke="none"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`,
+  windows: `<svg viewBox="0 0 24 24" width="15" height="15"><rect x="3" y="3" width="8" height="8" fill="currentColor"/><rect x="13" y="3" width="8" height="8" fill="currentColor"/><rect x="3" y="13" width="8" height="8" fill="currentColor"/><rect x="13" y="13" width="8" height="8" fill="currentColor"/></svg>`,
+  apple: `<svg viewBox="0 0 24 24" width="15" height="15"><path fill="currentColor" d="M16.7 8c-1 0-2 .6-2.7.6-.7 0-1.6-.6-2.6-.6-1.4 0-2.7.8-3.4 2-1.4 2.4-.4 6.1 1 8.1.7 1 1.5 2.1 2.5 2 1-.1 1.4-.6 2.6-.6s1.5.6 2.6.6c1.1 0 1.8-1 2.5-2 .5-.7.9-1.5 1.1-2.1-1.5-.5-2.4-2-2.4-3.5 0-1.4.8-2.6 2-3.3-.6-.9-1.5-1.5-2.4-1.2z"/><path fill="currentColor" d="M14 5.9c.5-.6 1-1.3 1-2.2 0-.1 0-.2 0-.3-.9.1-1.9.7-2.4 1.3-.5.6-1 1.4-1 2.2 0 .1 0 .2 0 .3 1 .1 1.9-.5 2.4-1.3z"/></svg>`,
+  linux: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7.5 9.5l3 2.5-3 2.5M12.5 15.5H17"/></svg>`,
+  print: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="13" width="12" height="8"/></svg>`,
+  copy: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="1.5"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`,
+};
+
+function docsCodeBlock(code) {
+  return `<div class="docs-code-wrap"><pre class="mono docs-pre">${escapeHtml(code)}</pre><button class="docs-copy-btn" data-docs-copy type="button">${DOCS_ICONS.copy}<span>Copier</span></button></div>`;
+}
+
+/* renvoie une LISTE d'etapes (chaine HTML chacune), assemblees ensuite avec des puces numerotees */
+function docsInstallStepList(os, pythonMode) {
   const noPython = pythonMode === "no-python";
   if (os === "windows") {
     if (noPython) {
-      return `
-        <ol class="docs-steps">
-          <li>Ouvre <strong>PowerShell</strong> (touche Windows → tape <code class="k">powershell</code> → Entrée).</li>
-          <li>Colle ces lignes en remplaçant l'URL et la clé (voir encadré ci-dessous pour les trouver), puis Entrée :
-            <pre class="mono docs-pre">$env:LEDGER_URL = "https://ton-serveur.com"
-$env:LEDGER_SYNC_API_KEY = "colle-ta-cle-ici"
-irm ${DOCS_REPO_RAW}/install.ps1 | iex</pre>
-          </li>
-          <li>C'est tout. Le script télécharge <code class="k">ledger-agent-windows.exe</code> dans <code class="k">%USERPROFILE%\\.ledger\\bin\\</code>, l'enregistre et programme son démarrage automatique (tâche planifiée Windows).</li>
-        </ol>`;
+      return [
+        `Ouvre <strong>PowerShell</strong> (touche Windows → tape <code class="k">powershell</code> → Entrée).`,
+        `Colle ces lignes en remplaçant l'URL et la clé (voir section 2 ci-dessus), puis Entrée :
+          ${docsCodeBlock(`$env:LEDGER_URL = "https://ton-serveur.com"\n$env:LEDGER_SYNC_API_KEY = "colle-ta-cle-ici"\nirm ${DOCS_REPO_RAW}/install.ps1 | iex`)}`,
+        `C'est tout. Le script télécharge <code class="k">ledger-agent-windows.exe</code> dans <code class="k">%USERPROFILE%\\.ledger\\bin\\</code>, l'enregistre et programme son démarrage automatique (tâche planifiée Windows).`,
+      ];
     }
-    return `
-      <ol class="docs-steps">
-        <li>Vérifie que Python est installé : ouvre PowerShell et tape <code class="k">python --version</code>. S'il n'est pas reconnu, utilise plutôt l'onglet "Sans Python" ci-dessus.</li>
-        <li>Récupère les fichiers du projet (dossier contenant <code class="k">configure_sync.py</code>) sur cette machine.</li>
-        <li>Dans PowerShell, place-toi dans ce dossier (<code class="k">cd chemin\\vers\\le\\dossier</code>) puis lance :
-          <pre class="mono docs-pre">python configure_sync.py
-python install_autosync.py</pre>
-        </li>
-        <li><code class="k">configure_sync.py</code> te demande l'URL du serveur et la clé API (voir encadré ci-dessous) ; <code class="k">install_autosync.py</code> programme le démarrage automatique.</li>
-      </ol>`;
+    return [
+      `Vérifie que Python est installé : ouvre PowerShell et tape <code class="k">python --version</code>. S'il n'est pas reconnu, utilise plutôt l'onglet "Sans Python" ci-dessus.`,
+      `Récupère les fichiers du projet (dossier contenant <code class="k">configure_sync.py</code>) sur cette machine.`,
+      `Dans PowerShell, place-toi dans ce dossier (<code class="k">cd chemin\\vers\\le\\dossier</code>) puis lance :
+        ${docsCodeBlock(`python configure_sync.py\npython install_autosync.py`)}`,
+      `<code class="k">configure_sync.py</code> te demande l'URL du serveur et la clé API (voir section 2) ; <code class="k">install_autosync.py</code> programme le démarrage automatique.`,
+    ];
   }
   if (os === "macos") {
     if (noPython) {
-      return `
-        <ol class="docs-steps">
-          <li>Ouvre <strong>Terminal</strong> (Cmd+Espace → tape <code class="k">terminal</code> → Entrée).</li>
-          <li>Colle cette commande en remplaçant l'URL et la clé :
-            <pre class="mono docs-pre">LEDGER_URL="https://ton-serveur.com" LEDGER_SYNC_API_KEY="colle-ta-cle-ici" \\
-  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"</pre>
-          </li>
-          <li>Le script télécharge <code class="k">ledger-agent-macos</code> dans <code class="k">~/.ledger/bin/</code>, le configure et l'enregistre comme LaunchAgent (démarre tout seul, y compris après redémarrage).</li>
-        </ol>`;
+      return [
+        `Ouvre <strong>Terminal</strong> (Cmd+Espace → tape <code class="k">terminal</code> → Entrée).`,
+        `Colle cette commande en remplaçant l'URL et la clé :
+          ${docsCodeBlock(`LEDGER_URL="https://ton-serveur.com" LEDGER_SYNC_API_KEY="colle-ta-cle-ici" \\\n  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"`)}`,
+        `Le script télécharge <code class="k">ledger-agent-macos</code> dans <code class="k">~/.ledger/bin/</code>, le configure et l'enregistre comme LaunchAgent (démarre tout seul, y compris après redémarrage).`,
+      ];
     }
-    return `
-      <ol class="docs-steps">
-        <li>Ouvre Terminal, vérifie Python avec <code class="k">python3 --version</code>.</li>
-        <li>Récupère les fichiers du projet (dossier contenant <code class="k">configure_sync.py</code>) sur cette machine, puis place-toi dedans (<code class="k">cd chemin/vers/le/dossier</code>).</li>
-        <li>Lance :
-          <pre class="mono docs-pre">python3 configure_sync.py
-python3 install_autosync.py</pre>
-        </li>
-        <li>Installe un LaunchAgent — les fichiers sont copiés dans <code class="k">~/Library/Application Support/Ledger/</code> (contrainte macOS : launchd ne peut pas accéder à <code class="k">~/Documents</code>).</li>
-      </ol>`;
+    return [
+      `Ouvre Terminal, vérifie Python avec <code class="k">python3 --version</code>.`,
+      `Récupère les fichiers du projet (dossier contenant <code class="k">configure_sync.py</code>) sur cette machine, puis place-toi dedans (<code class="k">cd chemin/vers/le/dossier</code>).`,
+      `Lance :
+        ${docsCodeBlock(`python3 configure_sync.py\npython3 install_autosync.py`)}`,
+      `Installe un LaunchAgent — les fichiers sont copiés dans <code class="k">~/Library/Application Support/Ledger/</code> (contrainte macOS : launchd ne peut pas accéder à <code class="k">~/Documents</code>).`,
+    ];
   }
   // linux
   if (noPython) {
-    return `
-      <ol class="docs-steps">
-        <li>Ouvre un terminal.</li>
-        <li>Colle cette commande en remplaçant l'URL et la clé :
-          <pre class="mono docs-pre">LEDGER_URL="https://ton-serveur.com" LEDGER_SYNC_API_KEY="colle-ta-cle-ici" \\
-  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"</pre>
-        </li>
-        <li>Le script télécharge <code class="k">ledger-agent-linux</code> dans <code class="k">~/.ledger/bin/</code> et l'enregistre comme service <code class="k">systemd --user</code> (redémarre tout seul en cas d'arrêt). Si <code class="k">systemd --user</code> n'est pas disponible (certains conteneurs/VPS minimalistes), repli automatique sur une entrée <code class="k">crontab</code>.</li>
-      </ol>`;
+    return [
+      `Ouvre un terminal.`,
+      `Colle cette commande en remplaçant l'URL et la clé :
+        ${docsCodeBlock(`LEDGER_URL="https://ton-serveur.com" LEDGER_SYNC_API_KEY="colle-ta-cle-ici" \\\n  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"`)}`,
+      `Le script télécharge <code class="k">ledger-agent-linux</code> dans <code class="k">~/.ledger/bin/</code> et l'enregistre comme service <code class="k">systemd --user</code> (redémarre tout seul en cas d'arrêt). Si <code class="k">systemd --user</code> n'est pas disponible (certains conteneurs/VPS minimalistes), repli automatique sur une entrée <code class="k">crontab</code>.`,
+    ];
   }
-  return `
-    <ol class="docs-steps">
-      <li>Ouvre un terminal, vérifie Python avec <code class="k">python3 --version</code>.</li>
-      <li>Récupère les fichiers du projet (dossier contenant <code class="k">configure_sync.py</code>) sur cette machine, puis place-toi dedans.</li>
-      <li>Lance :
-        <pre class="mono docs-pre">python3 configure_sync.py
-python3 install_autosync.py</pre>
-      </li>
-      <li>Installe un service <code class="k">systemd --user</code> (ou une entrée crontab en repli).</li>
-    </ol>`;
+  return [
+    `Ouvre un terminal, vérifie Python avec <code class="k">python3 --version</code>.`,
+    `Récupère les fichiers du projet (dossier contenant <code class="k">configure_sync.py</code>) sur cette machine, puis place-toi dedans.`,
+    `Lance :
+      ${docsCodeBlock(`python3 configure_sync.py\npython3 install_autosync.py`)}`,
+    `Installe un service <code class="k">systemd --user</code> (ou une entrée crontab en repli).`,
+  ];
+}
+
+function docsStepsHtml(steps) {
+  return `<div class="docs-steps">${steps.map((s, i) => `
+    <div class="docs-step">
+      <span class="docs-step-num">${i + 1}</span>
+      <div class="docs-step-body">${s}</div>
+    </div>`).join("")}</div>`;
 }
 
 function docsUninstallCommand(os, pythonMode) {
@@ -1898,56 +1972,116 @@ function docsUninstallCommand(os, pythonMode) {
   return os === "windows" ? "python uninstall_autosync.py" : "python3 uninstall_autosync.py";
 }
 
+function docsSectionHead(num, title, badge) {
+  return `<div class="docs-section-head"><span class="docs-num">${num}</span><h2>${title}</h2>${badge ? `<span class="docs-pill">${badge}</span>` : ""}<span class="docs-section-rule"></span></div>`;
+}
+
 function renderImport() {
+  const osIcons = { windows: DOCS_ICONS.windows, macos: DOCS_ICONS.apple, linux: DOCS_ICONS.linux };
   const osLabels = { windows: "Windows", macos: "macOS", linux: "Linux" };
-  const osTabs = `<div class="tabs">${Object.keys(osLabels).map(k => `<button data-docs-os="${k}" class="${state.docsOS === k ? "active" : ""}">${osLabels[k]}</button>`).join("")}</div>`;
+  const osTabs = `<div class="tabs docs-os-tabs">${Object.keys(osLabels).map(k => `<button data-docs-os="${k}" class="${state.docsOS === k ? "active" : ""}">${osIcons[k]}${osLabels[k]}</button>`).join("")}</div>`;
   const modeTabs = `<div class="tabs">
     <button data-docs-mode="no-python" class="${state.docsPythonMode === "no-python" ? "active" : ""}">Sans Python (recommandé)</button>
     <button data-docs-mode="python" class="${state.docsPythonMode === "python" ? "active" : ""}">Avec Python installé</button>
   </div>`;
 
+  const agent = agentStatus();
+
+  const toc = [
+    [1, "Comment ça marche"],
+    [2, "Trouver l'URL et la clé API"],
+    [3, "Installer l'agent"],
+    [4, "Vérifier que ça marche"],
+    [5, "Dépannage"],
+  ];
+
   return `
-    <div class="pagehead"><div><h1>Docs</h1><div class="desc">Installation de l'agent local, synchro automatique et utilisation du CRM</div></div></div>
-
-    <div class="card">
-      <div class="card-head"><h3>Comment ça marche</h3></div>
-      <div class="card-body">
-        <p style="margin:0;color:var(--ink-dim)">Sur ta machine, un petit programme (l'« agent local ») reste connecté en permanence à ce serveur. Il lit tes logs Claude Code locaux, calcule la consommation de tokens, et l'envoie ici — automatiquement toutes les 4h, ou en moins d'une seconde quand tu cliques sur "Rafraîchir" dans le CRM. Aucune action manuelle une fois installé : cette page se met à jour toute seule.</p>
-      </div>
+    <div class="docs-breadcrumb">
+      <span>Docs <span>›</span> Agent local</span>
+      <button class="btn ghost sm docs-print-btn" id="btn-print-docs">${DOCS_ICONS.print}<span>Imprimer</span></button>
     </div>
 
-    <div class="card">
-      <div class="card-head"><h3>Trouver l'URL et la clé API</h3><span class="hint">nécessaire pour l'installation, quelle que soit la machine</span></div>
-      <div class="card-body" style="color:var(--ink-dim)">
-        <ul style="margin:0;padding-left:18px;line-height:1.9">
-          <li><strong>URL du serveur</strong> : l'adresse à laquelle tu accèdes à ce CRM (ex. <code class="k">https://ledger.mondomaine.com</code>).</li>
-          <li><strong>Clé API de sync</strong> : affichée <strong>une seule fois</strong> dans le terminal, au tout premier démarrage du serveur. Si tu l'as perdue, elle reste lisible dans le fichier <code class="k">server/data/.env</code> sur le serveur (ligne <code class="k">SYNC_API_KEY=...</code>) — jamais affichée ici pour rester secrète.</li>
-        </ul>
-      </div>
-    </div>
+    <div class="docs-layout" id="docs-print-area">
+      <div class="docs-main">
+        <h1 class="docs-title">Installation de l'agent local, synchro automatique et utilisation du CRM</h1>
+        <p class="docs-subtitle">L'agent local assure une connexion permanente à ce serveur, lit tes logs Claude Code en local, et synchronise automatiquement ta consommation de tokens.</p>
 
-    <div class="card">
-      <div class="card-head"><h3>Installer l'agent sur une machine</h3></div>
-      <div class="card-body">
-        ${osTabs}
-        <div style="margin-top:12px">${modeTabs}</div>
-        <div style="margin-top:16px">${docsInstallSteps(state.docsOS, state.docsPythonMode)}</div>
-        <div class="hint" style="color:var(--ink-faint);font-size:12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-          Pour désinstaller : <code class="k">${docsUninstallCommand(state.docsOS, state.docsPythonMode)}</code>
+        <div class="docs-callout success">
+          <span class="docs-callout-icon">${DOCS_ICONS.check}</span>
+          <div><strong>Une fois installé, l'agent fonctionne tout seul.</strong><div>Aucune action manuelle : le CRM se met à jour automatiquement.</div></div>
         </div>
-      </div>
-    </div>
 
-    <div class="card">
-      <div class="card-head"><h3>Vérifier que ça marche</h3></div>
-      <div class="card-body" style="color:var(--ink-dim)">
-        <p style="margin:0 0 10px">Reviens sur cette page quelques secondes après l'installation : le badge "Agent local" en bas de la barre latérale doit passer à <strong>Actif</strong>. Si ce n'est pas le cas :</p>
-        <ul style="margin:0;padding-left:18px;line-height:1.9">
-          <li>Vérifie les logs sur la machine : <code class="k">~/.ledger/logs/sync.log</code> (<code class="k">%USERPROFILE%\\.ledger\\logs\\sync.log</code> sur Windows).</li>
-          <li>Vérifie que l'URL du serveur est bien accessible depuis cette machine (essaie de l'ouvrir dans un navigateur).</li>
-          <li>Vérifie que la clé API collée est bien complète, sans espace ni retour à la ligne en trop.</li>
-        </ul>
+        <section class="docs-section" id="docs-section-1">
+          ${docsSectionHead(1, "Comment ça marche")}
+          <p class="docs-p">Sur ta machine, un petit programme (l'« agent local ») reste connecté en permanence à ce serveur. Il lit tes logs Claude Code locaux, calcule la consommation de tokens, et l'envoie ici — automatiquement toutes les 4h, ou en moins d'une seconde quand tu cliques sur "Rafraîchir" dans le CRM.</p>
+        </section>
+
+        <section class="docs-section" id="docs-section-2">
+          ${docsSectionHead(2, "Trouver l'URL et la clé API", "Nécessaire pour l'installation")}
+          <div class="docs-item">
+            <span class="docs-item-icon">${DOCS_ICONS.globe}</span>
+            <div><div class="docs-item-title">URL du serveur</div><div class="docs-item-desc">L'adresse à laquelle tu accèdes à ce CRM (ex. <code class="k">https://ledger.mondomaine.com</code>).</div></div>
+          </div>
+          <div class="docs-item">
+            <span class="docs-item-icon">${DOCS_ICONS.key}</span>
+            <div><div class="docs-item-title">Clé API de sync</div><div class="docs-item-desc">Affichée <strong>une seule fois</strong> dans le terminal, au tout premier démarrage du serveur. Si tu l'as perdue, elle reste lisible dans le fichier <code class="k">server/data/.env</code> sur le serveur (ligne <code class="k">SYNC_API_KEY=...</code>). Jamais affichée ici pour rester secrète.</div></div>
+          </div>
+        </section>
+
+        <section class="docs-section" id="docs-section-3">
+          ${docsSectionHead(3, "Installer l'agent sur une machine")}
+          ${osTabs}
+          <div style="margin-top:10px">${modeTabs}</div>
+          <div style="margin-top:16px">${docsStepsHtml(docsInstallStepList(state.docsOS, state.docsPythonMode))}</div>
+          <div class="docs-callout info">
+            <span class="docs-callout-icon">${DOCS_ICONS.help}</span>
+            <div>Pour désinstaller : <code class="k">${docsUninstallCommand(state.docsOS, state.docsPythonMode)}</code></div>
+          </div>
+        </section>
+
+        <section class="docs-section" id="docs-section-4">
+          ${docsSectionHead(4, "Vérifier que ça marche")}
+          <p class="docs-p">Reviens sur cette page quelques secondes après l'installation :</p>
+          <div class="docs-status-pill ${agent.seen ? "on" : "off"}">
+            <span class="dot"></span>
+            <strong>Agent local : ${agent.seen ? "Actif" : "Non détecté"}</strong>
+            <span class="docs-status-sub">${state.agentLastSeen ? `Dernier contact : ${new Date(state.agentLastSeen).toLocaleTimeString("fr-FR")}` : "Aucun contact enregistré"}</span>
+          </div>
+          <p class="docs-p" style="margin-top:12px">Si ce n'est pas le cas : consulte la section <a href="#docs-section-5" data-docs-scroll="5">Dépannage</a>.</p>
+        </section>
+
+        <section class="docs-section" id="docs-section-5">
+          ${docsSectionHead(5, "Dépannage")}
+          <ul class="docs-list">
+            <li>Vérifie les logs sur la machine : <code class="k">~/.ledger/logs/sync.log</code> (<code class="k">%USERPROFILE%\\.ledger\\logs\\sync.log</code> sur Windows).</li>
+            <li>Vérifie que l'URL du serveur est bien accessible depuis cette machine (essaie de l'ouvrir dans un navigateur).</li>
+            <li>Vérifie que la clé API collée est bien complète, sans espace ni retour à la ligne en trop.</li>
+            <li>Sur macOS, l'agent tourne via <code class="k">launchd</code> — vérifie avec <code class="k">launchctl list | grep ledger</code>.</li>
+            <li>Sur Linux (avec systemd), vérifie avec <code class="k">systemctl --user status ledger-tokensync</code>.</li>
+            <li>Sur Windows, vérifie avec <code class="k">schtasks /Query /TN LedgerTokenSync</code>.</li>
+          </ul>
+        </section>
       </div>
+
+      <aside class="docs-aside">
+        <div class="docs-aside-card">
+          <div class="docs-aside-title">Sommaire</div>
+          <ol class="docs-toc">
+            ${toc.map(([n, label]) => `<li><a href="#docs-section-${n}" data-docs-scroll="${n}"><span>${n}</span>${label}</a></li>`).join("")}
+          </ol>
+        </div>
+        <div class="docs-aside-card accent">
+          <span class="docs-aside-icon">${DOCS_ICONS.shield}</span>
+          <div class="docs-aside-title">Sécurité</div>
+          <p>Ta clé API est stockée uniquement sur ta machine et utilisée pour envoyer les données à ton serveur.</p>
+        </div>
+        <div class="docs-aside-card">
+          <span class="docs-aside-icon">${DOCS_ICONS.help}</span>
+          <div class="docs-aside-title">Besoin d'aide ?</div>
+          <p>Si tu rencontres un problème, consulte la section Dépannage.</p>
+          <a class="docs-aside-btn" href="#docs-section-5" data-docs-scroll="5">Voir le dépannage →</a>
+        </div>
+      </aside>
     </div>
   `;
 }
@@ -2239,6 +2373,27 @@ function wireView() {
   document.querySelectorAll("[data-docs-mode]").forEach(el => {
     el.onclick = () => { state.docsPythonMode = el.dataset.docsMode; render(); };
   });
+  document.querySelectorAll("[data-docs-scroll]").forEach(el => {
+    el.onclick = (e) => {
+      e.preventDefault();
+      const target = document.getElementById("docs-section-" + el.dataset.docsScroll);
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+  });
+  document.querySelectorAll("[data-docs-copy]").forEach(btn => {
+    btn.onclick = async () => {
+      const pre = btn.previousElementSibling;
+      try {
+        await navigator.clipboard.writeText(pre.textContent);
+        const label = btn.querySelector("span");
+        const original = label.textContent;
+        label.textContent = "Copié !";
+        setTimeout(() => { label.textContent = original; }, 1500);
+      } catch (e) { toast("Impossible de copier"); }
+    };
+  });
+  const printDocsBtn = document.getElementById("btn-print-docs");
+  if (printDocsBtn) printDocsBtn.onclick = () => window.print();
   const periodSelect = document.getElementById("trend-period");
   if (periodSelect) periodSelect.onchange = () => { state.trendPeriod = parseInt(periodSelect.value, 10); render(); };
   const scrollDetailBtn = document.getElementById("btn-scroll-detail");
