@@ -47,11 +47,18 @@ db.exec(`
     first_seen TEXT NOT NULL,
     last_seen TEXT NOT NULL
   );
+
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
 `);
+
+/* migration: usage_entries predates per-device tracking */
+const usageCols = db.prepare("PRAGMA table_info(usage_entries)").all().map(c => c.name);
+if (!usageCols.includes("device_id")) {
+  db.exec("ALTER TABLE usage_entries ADD COLUMN device_id TEXT NOT NULL DEFAULT 'legacy'");
+}
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
