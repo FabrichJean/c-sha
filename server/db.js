@@ -60,6 +60,9 @@ if (!usageCols.includes("device_id")) {
   db.exec("ALTER TABLE usage_entries ADD COLUMN device_id TEXT NOT NULL DEFAULT 'legacy'");
 }
 
+/* migration: devices predates the shareable view-link feature */
+const deviceCols = db.prepare("PRAGMA table_info(devices)").all().map(c => c.name);
+if (!deviceCols.includes("view_token")) {
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
