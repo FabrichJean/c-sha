@@ -444,10 +444,87 @@ function render() {
             <option value="7" ${period === 7 ? "selected" : ""}>7 jours</option>
             <option value="14" ${period === 14 ? "selected" : ""}>14 jours</option>
             <option value="30" ${period === 30 ? "selected" : ""}>30 jours</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body chart-wrap">
+        <div class="legend" style="margin:0 0 10px"><span><span class="sw" style="background:#c9622a"></span>Tokens</span><span><span class="sw" style="background:var(--good)"></span>Coût (USD)</span></div>
+        ${lineChartDual(trendTok.dates, trendTok.values, trendCost.values, state.trendMetric)}
+      </div>
+      <div class="trend-foot">
+        <span class="trend-note ${trendUp ? "up" : "down"}">${trendUp ? "↗" : "↘"} ${Math.abs(trendPct).toFixed(0)}% de ${state.trendMetric === "tokens" ? "tokens" : "coût"} par rapport à la période précédente</span>
+      </div>
+    </div>`;
+
+  const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+  const in30 = rows.filter(r => r.date >= d30.toISOString().slice(0, 10));
+  const byProject = aggregate(in30, r => r.projectKey);
+  const projectEntries = [...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
+  const projectTotal = projectEntries.reduce((s, [, t]) => s + totalTokens(t), 0);
+  const projColors = ["var(--accent)", "var(--violet)", "#c9622a", "var(--bad)"];
+
+  const donutCard = `
+    <div class="card" style="margin-bottom:0">
+      <div class="trend-head"><div class="trend-head-title"><div class="th-icon" style="background:linear-gradient(135deg,#6a5aa8,#4a3c80)">◐</div><h3>Répartition par projet</h3></div></div>
+      <div class="card-body">
+        <div class="donut-row">
+          <div style="position:relative">
+            ${donutSvg(projectEntries, projColors)}
+            <div class="donut-center-label" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+              <div class="dc-total">Total</div><div class="dc-value">${fmtCompact(projectTotal)}</div><div class="dc-unit">tokens</div>
+            </div>
+          </div>
+          <div class="legend-table">
+            <div class="lt-head"><span>Projet</span><span>Tokens</span><span>%</span></div>
+            ${projectEntries.length ? projectLegendTable(projectEntries, projectTotal, projColors) : emptyMini()}
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const detailTable = `
+    <div class="card">
+      <div class="trend-head"><h3>Détail par projet</h3><span style="font-size:12px;color:var(--ink-faint)">30 derniers jours, coût estimé</span></div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Projet</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th><th class="num">Coût est.</th></tr></thead>
+          <tbody>
+            ${projectEntries.map(([pkey, t]) => {
+              const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
+              return `<tr>
+                <td>${escapeHtml(projectName(pkey))}</td>
+                <td class="num mono">${fmtNum(t.input)}</td>
+                <td class="num mono">${fmtNum(t.output)}</td>
+                <td class="num mono">${fmtNum(t.cacheCreate + t.cacheRead)}</td>
+                <td class="num mono">${fmtNum(totalTokens(t))}</td>
+                <td class="num mono">${fmtUsd(cost)}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  main.innerHTML = `
+    ${head}
+    ${kpiHtml}
+    <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:14px;align-items:start;margin-bottom:20px">
+      ${trendCard}
+      ${donutCard}
     </div>
+    ${detailTable}
   `;
+  wire();
+}
+
+function wire() {
   const btn = document.getElementById("btn-refresh");
   if (btn) btn.onclick = handleRefresh;
+  document.querySelectorAll("[data-trend-metric]").forEach(el => {
+    el.onclick = () => { state.trendMetric = el.dataset.trendMetric; render(); };
+  });
+  const periodSelect = document.getElementById("trend-period");
+  if (periodSelect) periodSelect.onchange = () => { state.trendPeriod = parseInt(periodSelect.value, 10); render(); };
 }
 
 async function handleRefresh() {
