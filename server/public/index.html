@@ -964,6 +964,46 @@ function renderDevices() {
             const st = deviceStatus(d);
             const dotColor = st.historic ? "var(--ink-faint)" : st.seen ? "var(--good)" : "var(--warn)";
             return `<tr>
+              <td>
+                <strong>${escapeHtml(d.name)}</strong>
+                ${d.hostname && d.hostname !== d.name ? `<div class="hint" style="color:var(--ink-faint)">${escapeHtml(d.hostname)}</div>` : ""}
+              </td>
+              <td><span class="dot" style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${dotColor};margin-right:6px"></span>${st.label}</td>
+              <td class="hint" style="color:var(--ink-dim)">${d.lastSeen ? timeAgo(d.lastSeen) : "—"}</td>
+              <td class="num mono">${fmtCompact(d.tokens)}</td>
+              <td class="num mono">${fmtUsd(d.cost)}</td>
+              <td style="text-align:right;white-space:nowrap">
+                ${d.id !== "legacy" ? `<button class="btn ghost sm" data-rename-device="${d.id}">Renommer</button> <button class="btn ghost sm" data-del-device="${d.id}">Supprimer</button>` : ""}
+              </td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`}
+    </div>
+  `;
+}
+
+function deviceModal(device) {
+  openModal(`
+    <div class="mh">Renommer l'appareil</div>
+    <div class="mb">
+      <div class="field"><label>Nom</label><input id="m-name" value="${escapeHtml(device.name)}" placeholder="MacBook Pro de Marc"></div>
+    </div>
+    <div class="mf"><button class="btn ghost" id="m-cancel">Annuler</button><button class="btn primary" id="m-save">Enregistrer</button></div>
+  `);
+  document.getElementById("m-cancel").onclick = closeModal;
+  document.getElementById("m-save").onclick = async () => {
+    const name = document.getElementById("m-name").value.trim();
+    if (!name) { toast("Le nom est requis"); return; }
+    try {
+      await api("/api/devices/" + device.id, { method: "PUT", body: JSON.stringify({ name }) });
+      closeModal();
+      toast("Appareil renommé");
+      await loadState();
+    } catch (e) { toast("Erreur : " + e.message); }
+  };
+}
+
 function renderImport() {
   const sync = state.lastSync;
   const agent = agentStatus();
@@ -1183,6 +1223,7 @@ async function handleRefreshClick() {
         state.clients = data.clients || [];
         state.projects = data.projects || [];
         state.usage = data.usage || [];
+        state.devices = data.devices || [];
         state.pricing = data.pricing || DEFAULT_PRICING;
         state.lastSync = data.lastSync || null;
         state.refreshing = false;
@@ -1258,6 +1299,16 @@ function wireView() {
     };
   });
   document.querySelectorAll("[data-quick-link]").forEach(el => { el.onclick = () => projectModal(null, el.dataset.quickLink); });
+
+  document.querySelectorAll("[data-rename-device]").forEach(el => {
+    el.onclick = () => deviceModal(state.devices.find(d => d.id === el.dataset.renameDevice));
+  });
+  document.querySelectorAll("[data-del-device]").forEach(el => {
+    el.onclick = async () => {
+      try { await api("/api/devices/" + el.dataset.delDevice, { method: "DELETE" }); toast("Appareil supprimé"); await loadState(); }
+      catch (err) { toast("Erreur : " + err.message); }
+    };
+  });
 
   const importManualBtn = document.getElementById("btn-import-manual");
   if (importManualBtn) importManualBtn.onclick = handleImportManual;
