@@ -194,6 +194,33 @@ function costOf(model, totals) {
   const p = pricingFor(model);
   const t = totals || {};
   return (t.input || 0) * p.in / 1e6 + (t.output || 0) * p.out / 1e6 +
+         (t.cacheCreate || 0) * p.cacheWrite / 1e6 + (t.cacheRead || 0) * p.cacheRead / 1e6;
+}
+function projectName(key) { return (state.data && state.data.projectNames && state.data.projectNames[key]) || key; }
+
+function aggregate(rows, keyFn) {
+  const map = new Map();
+  for (const r of rows) {
+    const k = keyFn(r);
+    if (!map.has(k)) map.set(k, { input: 0, output: 0, cacheCreate: 0, cacheRead: 0 });
+    const b = map.get(k);
+    b.input += r.input || 0; b.output += r.output || 0;
+    b.cacheCreate += r.cacheCreate || 0; b.cacheRead += r.cacheRead || 0;
+  }
+  return map;
+}
+function dailySeries(rows, days, reducer) {
+  const byDate = new Map();
+  for (const r of rows) {
+    if (!byDate.has(r.date)) byDate.set(r.date, []);
+    byDate.get(r.date).push(r);
+  }
+  const now = new Date();
+  const dates = [];
+  for (let i = days - 1; i >= 0; i--) { const dt = new Date(now); dt.setDate(dt.getDate() - i); dates.push(dt.toISOString().slice(0, 10)); }
+  return { dates, values: dates.map(d => reducer(byDate.get(d) || [])) };
+}
+function emptyMini() { return `<div style="padding:20px 0;text-align:center;color:var(--ink-faint)">Pas de données sur cette période.</div>`; }
 
 function sparklineSvg(values, color) {
   const w = 240, h = 34, pad = 3;
@@ -229,6 +256,56 @@ function kpiCard({ icon, iconBg, sparkColor, badgePct, title, big, periods, spar
     </div>`;
 }
 
+function lineChartDual(dates, seriesTokens, seriesCost, activeMetric) {
+  const w = 900, h = 230, padL = 46, padR = 46, padT = 14, padB = 26;
+  const maxTok = Math.max(1, ...seriesTokens), maxCost = Math.max(1, ...seriesCost);
+  const stepX = dates.length > 1 ? (w - padL - padR) / (dates.length - 1) : 0;
+  const yTok = v => padT + (h - padT - padB) * (1 - v / maxTok);
+  const yCost = v => padT + (h - padT - padB) * (1 - v / maxCost);
+  const pathFor = (values, yFn) => values.map((v, i) => `${i === 0 ? "M" : "L"}${(padL + i * stepX).toFixed(1)},${yFn(v).toFixed(1)}`).join(" ");
+  const tokPath = pathFor(seriesTokens, yTok);
+  const costPath = pathFor(seriesCost, yCost);
+  const tokActive = activeMetric === "tokens";
+  const gridY = [0, 0.25, 0.5, 0.75, 1].map(f => {
+    const y = padT + (h - padT - padB) * (1 - f);
+    return `<line x1="${padL}" x2="${w - padR}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="1"></line>
+      <text x="${padL - 8}" y="${y + 3}" font-size="10" text-anchor="end">${fmtCompact(maxTok * f)}</text>
+      <text x="${w - padR + 8}" y="${y + 3}" font-size="10" text-anchor="start">${fmtUsd(maxCost * f).replace(".00", "")}</text>`;
+  }).join("");
+  const labelEvery = Math.max(1, Math.ceil(dates.length / 8));
+  const labels = dates.map((d, i) => i % labelEvery !== 0 ? "" : `<text x="${padL + i * stepX}" y="${h - 6}" font-size="10" text-anchor="middle">${d.slice(5)}</text>`).join("");
+  const dot = (values, yFn, color) => { const i = values.length - 1; return `<circle cx="${(padL + i * stepX).toFixed(1)}" cy="${yFn(values[i]).toFixed(1)}" r="3.5" fill="${color}"></circle>`; };
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px;display:block" role="img" aria-label="Consommation dans le temps">
+    ${gridY}
+    <path d="${costPath}" fill="none" stroke="var(--good)" stroke-width="${tokActive ? 1.5 : 2.25}" opacity="${tokActive ? 0.45 : 1}" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="${tokPath}" fill="none" stroke="#c9622a" stroke-width="${tokActive ? 2.25 : 1.5}" opacity="${tokActive ? 1 : 0.45}" stroke-linecap="round" stroke-linejoin="round"></path>
+    ${dot(seriesCost, yCost, "var(--good)")}
+    ${dot(seriesTokens, yTok, "#c9622a")}
+    ${labels}
+  </svg>`;
+}
+
+function donutSvg(entries, colors) {
+  const total = entries.reduce((s, [, t]) => s + totalTokens(t), 0) || 1;
+  const top = entries.slice(0, 4);
+  const restTotal = entries.slice(4).reduce((s, [, t]) => s + totalTokens(t), 0);
+  const slices = top.map(([, t], i) => ({ value: totalTokens(t), color: colors[i % colors.length] }));
+  if (restTotal > 0) slices.push({ value: restTotal, color: "var(--ink-faint)" });
+  const r = 58, cx = 76, cy = 76, sw = 24;
+  const circumference = 2 * Math.PI * r;
+  let acc = 0;
+  const arcs = slices.map(s => {
+    const frac = s.value / total;
+    const dash = frac * circumference;
+    const offset = circumference - acc * circumference;
+    acc += frac;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${s.color}" stroke-width="${sw}"
+      stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${offset}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+  }).join("");
+  return `<svg width="152" height="152" viewBox="0 0 152 152">${arcs}</svg>`;
+}
+
+function projectLegendTable(entries, total, colors) {
 async function loadData() {
   try {
     const res = await fetch(`/api/device-view/${encodeURIComponent(DEVICE_ID)}/${encodeURIComponent(TOKEN)}`);
