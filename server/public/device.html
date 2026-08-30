@@ -306,6 +306,19 @@ function donutSvg(entries, colors) {
 }
 
 function projectLegendTable(entries, total, colors) {
+  if (!entries.length) return emptyMini();
+  const top = entries.slice(0, 4);
+  const restTotal = entries.slice(4).reduce((s, [, t]) => s + totalTokens(t), 0);
+  const rows = top.map(([pkey, t], i) => ({ label: projectName(pkey), value: totalTokens(t), color: colors[i % colors.length] }));
+  if (restTotal > 0) rows.push({ label: "Autres", value: restTotal, color: "var(--ink-faint)" });
+  return rows.map(r => `
+    <div class="lt-row">
+      <div class="lt-name"><span class="lt-dot" style="background:${r.color}"></span>${escapeHtml(r.label)}</div>
+      <div class="lt-value">${fmtCompact(r.value)}</div>
+      <div class="lt-pct">${total ? ((r.value / total) * 100).toFixed(1) : "0.0"}%</div>
+    </div>`).join("");
+}
+
 async function loadData() {
   try {
     const res = await fetch(`/api/device-view/${encodeURIComponent(DEVICE_ID)}/${encodeURIComponent(TOKEN)}`);
@@ -343,15 +356,15 @@ function refreshBanner() {
 function render() {
   if (!state.data) return;
   const d = state.data.device;
-  const k = state.data.kpis;
+  const rows = state.data.rows || [];
   const main = document.getElementById("main");
-  main.innerHTML = `
+
+  const head = `
     <div class="brand"><span class="mark"></span>Ledger · vue appareil</div>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
       <div><h1>${escapeHtml(d.name)}</h1><div class="desc">Statistiques de consommation Claude Code de cet appareil</div></div>
       <button class="btn primary" id="btn-refresh" ${state.refreshing ? "disabled" : ""}>${state.refreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir"}</button>
     </div>
-
     <div class="card"><div class="info-card">
       <span class="widget-live ${state.data.seen ? "on" : "off"}"><span class="w-pulse"></span>${state.data.seen ? "Actif" : "Hors ligne"}</span>
       ${d.hostname && d.hostname !== d.name ? `<div class="info-item"><div class="il">Machine</div><div class="iv">${escapeHtml(d.hostname)}</div></div>` : ""}
@@ -359,28 +372,78 @@ function render() {
       ${d.lastSeen ? `<div class="info-item"><div class="il">Dernier contact</div><div class="iv">${timeAgo(d.lastSeen)}</div></div>` : ""}
       <div class="info-item"><div class="il">Dernière donnée reçue</div><div class="iv">${state.data.lastDataAt ? timeAgo(state.data.lastDataAt) : "—"}</div></div>
     </div></div>
-
     ${refreshBanner()}
+  `;
 
+  if (rows.length === 0) {
+    main.innerHTML = `${head}<div class="card"><div class="empty"><div class="big">▧</div>Aucune conso reçue pour cet appareil pour l'instant.</div></div>`;
+    wire();
+    return;
+  }
+
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const ydt = new Date(now); ydt.setDate(ydt.getDate() - 1);
+  const yesterdayStr = ydt.toISOString().slice(0, 10);
+  const rowsToday = rows.filter(r => r.date === todayStr);
+  const rowsYesterday = rows.filter(r => r.date === yesterdayStr);
+  const cacheOf = r => (r.cacheCreate || 0) + (r.cacheRead || 0);
+
+  const tokTotal = { today: rowsToday.reduce((s, r) => s + totalTokens(r), 0), yest: rowsYesterday.reduce((s, r) => s + totalTokens(r), 0), all: rows.reduce((s, r) => s + totalTokens(r), 0) };
+  const costTotal = { today: rowsToday.reduce((s, r) => s + costOf(r.model, r), 0), yest: rowsYesterday.reduce((s, r) => s + costOf(r.model, r), 0), all: rows.reduce((s, r) => s + costOf(r.model, r), 0) };
+  const cacheTotal = { today: rowsToday.reduce((s, r) => s + cacheOf(r), 0), yest: rowsYesterday.reduce((s, r) => s + cacheOf(r), 0), all: rows.reduce((s, r) => s + cacheOf(r), 0) };
+
+  const spTokens = dailySeries(rows, 7, rs => rs.reduce((s, r) => s + totalTokens(r), 0));
+  const spCost = dailySeries(rows, 7, rs => rs.reduce((s, r) => s + costOf(r.model, r), 0));
+  const spCache = dailySeries(rows, 7, rs => rs.reduce((s, r) => s + cacheOf(r), 0));
+
+  const kpiHtml = `
     <div class="kpi-grid">
       ${kpiCard({
         icon: "◆", iconBg: "linear-gradient(135deg,#e08a3c,#c9622a)", sparkColor: "#c9622a",
-        badgePct: pctChange(k.tokens.today, k.tokens.yesterday), title: "Tokens", big: fmtCompact(k.tokens.today),
-        periods: [{ label: "Aujourd'hui", value: fmtCompact(k.tokens.today) }, { label: "Hier", value: fmtCompact(k.tokens.yesterday) }, { label: "Total", value: fmtCompact(k.tokens.total) }],
-        sparkValues: k.tokens.sparkline,
+        badgePct: pctChange(tokTotal.today, tokTotal.yest), title: "Tokens", big: fmtCompact(tokTotal.today),
+        periods: [{ label: "Aujourd'hui", value: fmtCompact(tokTotal.today) }, { label: "Hier", value: fmtCompact(tokTotal.yest) }, { label: "Total", value: fmtCompact(tokTotal.all) }],
+        sparkValues: spTokens.values,
       })}
       ${kpiCard({
         icon: "$", iconBg: "linear-gradient(135deg,#3f8f6e,#276b52)", sparkColor: "var(--good)",
-        badgePct: pctChange(k.cost.today, k.cost.yesterday), title: "Coût estimé", big: fmtUsd(k.cost.today),
-        periods: [{ label: "Aujourd'hui", value: fmtUsd(k.cost.today) }, { label: "Hier", value: fmtUsd(k.cost.yesterday) }, { label: "Total", value: fmtUsd(k.cost.total) }],
-        sparkValues: k.cost.sparkline,
+        badgePct: pctChange(costTotal.today, costTotal.yest), title: "Coût estimé", big: fmtUsd(costTotal.today),
+        periods: [{ label: "Aujourd'hui", value: fmtUsd(costTotal.today) }, { label: "Hier", value: fmtUsd(costTotal.yest) }, { label: "Total", value: fmtUsd(costTotal.all) }],
+        sparkValues: spCost.values,
       })}
       ${kpiCard({
         icon: "▤", iconBg: "linear-gradient(135deg,#6a5aa8,#4a3c80)", sparkColor: "var(--violet)",
-        badgePct: pctChange(k.cache.today, k.cache.yesterday), title: "Cache", big: fmtCompact(k.cache.today),
-        periods: [{ label: "Aujourd'hui", value: fmtCompact(k.cache.today) }, { label: "Hier", value: fmtCompact(k.cache.yesterday) }, { label: "Total", value: fmtCompact(k.cache.total) }],
-        sparkValues: k.cache.sparkline,
+        badgePct: pctChange(cacheTotal.today, cacheTotal.yest), title: "Cache", big: fmtCompact(cacheTotal.today),
+        periods: [{ label: "Aujourd'hui", value: fmtCompact(cacheTotal.today) }, { label: "Hier", value: fmtCompact(cacheTotal.yest) }, { label: "Total", value: fmtCompact(cacheTotal.all) }],
+        sparkValues: spCache.values,
       })}
+    </div>`;
+
+  const period = state.trendPeriod;
+  const trendTok = dailySeries(rows, period, rs => rs.reduce((s, r) => s + totalTokens(r), 0));
+  const trendCost = dailySeries(rows, period, rs => rs.reduce((s, r) => s + costOf(r.model, r), 0));
+  const trendTok2x = dailySeries(rows, period * 2, rs => rs.reduce((s, r) => s + totalTokens(r), 0));
+  const trendCost2x = dailySeries(rows, period * 2, rs => rs.reduce((s, r) => s + costOf(r.model, r), 0));
+  const curTok = trendTok2x.values.slice(period).reduce((a, b) => a + b, 0);
+  const prevTok = trendTok2x.values.slice(0, period).reduce((a, b) => a + b, 0);
+  const curCost = trendCost2x.values.slice(period).reduce((a, b) => a + b, 0);
+  const prevCost = trendCost2x.values.slice(0, period).reduce((a, b) => a + b, 0);
+  const trendPct = state.trendMetric === "tokens" ? pctChange(curTok, prevTok) : pctChange(curCost, prevCost);
+  const trendUp = trendPct >= 0;
+
+  const trendCard = `
+    <div class="card" style="margin-bottom:0">
+      <div class="trend-head">
+        <div class="trend-head-title"><div class="th-icon">▦</div><h3>Consommation des ${period} derniers jours</h3></div>
+        <div class="trend-controls">
+          <div class="tabs">
+            <button data-trend-metric="tokens" class="${state.trendMetric === "tokens" ? "active" : ""}">Tokens</button>
+            <button data-trend-metric="cost" class="${state.trendMetric === "cost" ? "active" : ""}">Coût</button>
+          </div>
+          <select id="trend-period" class="period-select">
+            <option value="7" ${period === 7 ? "selected" : ""}>7 jours</option>
+            <option value="14" ${period === 14 ? "selected" : ""}>14 jours</option>
+            <option value="30" ${period === 30 ? "selected" : ""}>30 jours</option>
     </div>
   `;
   const btn = document.getElementById("btn-refresh");
