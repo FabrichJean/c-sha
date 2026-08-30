@@ -308,7 +308,7 @@ app.get("/api/state", (req, res) => {
   const agentLastSeen = agentSeenRow ? JSON.parse(agentSeenRow.value) : null;
   const syncRequested = getSyncRequest();
   const devices = db.prepare("SELECT * FROM devices ORDER BY last_seen DESC").all().map(d => ({
-    id: d.id, name: d.name, hostname: d.hostname, firstSeen: d.first_seen, lastSeen: d.last_seen,
+    id: d.id, name: d.name, hostname: d.hostname, clientId: d.client_id, firstSeen: d.first_seen, lastSeen: d.last_seen,
     viewToken: d.view_token || ensureViewToken(d.id),
   }));
   if (usage.some(u => u.deviceId === "legacy") && !devices.some(d => d.id === "legacy")) {
@@ -325,7 +325,7 @@ app.get("/api/state", (req, res) => {
 });
 
 app.put("/api/devices/:id", (req, res) => {
-  const { name } = req.body;
+  const { name, clientId } = req.body;
   if (!name) return res.status(400).json({ error: "Le nom est requis." });
   const info = db.prepare("UPDATE devices SET name = ? WHERE id = ?").run(name, req.params.id);
   if (info.changes === 0) return res.status(404).json({ error: "Appareil introuvable." });
