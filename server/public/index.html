@@ -277,6 +277,7 @@ const state = {
   refreshAttempts: 0,
   trendMetric: "tokens",
   trendPeriod: 7,
+  selectedDeviceId: null,
 };
 
 const DEFAULT_PRICING = {
@@ -571,7 +572,7 @@ function allDailyRows() {
   const rows = [];
   for (const u of state.usage) {
     const daily = u.daily || {};
-    for (const [date, t] of Object.entries(daily)) rows.push({ date, projectKey: u.projectKey, model: u.model, ...t });
+    for (const [date, t] of Object.entries(daily)) rows.push({ date, projectKey: u.projectKey, model: u.model, deviceId: u.deviceId, ...t });
   }
   return rows;
 }
@@ -592,41 +593,26 @@ function totalTokens(t) { return (t.input || 0) + (t.output || 0) + (t.cacheCrea
 /* ---------------- rendering ---------------- */
 function render() {
   const main = document.getElementById("main");
-  document.querySelectorAll(".navitem").forEach(b => b.classList.toggle("active", b.dataset.view === state.view));
+  const activeNavView = state.view === "device-detail" ? "devices" : state.view;
+  document.querySelectorAll(".navitem").forEach(b => b.classList.toggle("active", b.dataset.view === activeNavView));
   if (!state.loaded) { main.innerHTML = `<div class="empty">Chargement…</div>`; return; }
   if (state.view === "dashboard") main.innerHTML = renderDashboard();
   else if (state.view === "clients") main.innerHTML = renderClients();
   else if (state.view === "projects") main.innerHTML = renderProjects();
   else if (state.view === "import") main.innerHTML = renderImport();
   else if (state.view === "devices") main.innerHTML = renderDevices();
+  else if (state.view === "device-detail") main.innerHTML = renderDeviceDetail();
   else if (state.view === "settings") main.innerHTML = renderSettings();
   wireView();
 }
 
-function renderDashboard() {
-  const rows = allDailyRows();
-  if (rows.length === 0) {
-    return `
-      <div class="pagehead"><div><h1>Tableau de bord</h1><div class="desc">Vue d'ensemble de ta consommation de tokens Claude Code</div></div></div>
-      ${refreshProgressBanner()}
-      <div class="card"><div class="empty">
-        <div class="big">◧</div>
-        <div><strong>Aucune donnée pour l'instant.</strong></div>
-        <div style="margin-top:6px">La synchro automatique alimentera cette page dès son premier envoi.</div>
-        <div style="display:flex;gap:8px;justify-content:center;margin-top:16px">
-          <button class="btn primary" id="btn-refresh" ${state.refreshing ? "disabled" : ""}>${state.refreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir maintenant"}</button>
-          <button class="btn" data-nav="import">Voir le statut de synchro</button>
-        </div>
-      </div></div>`;
-  }
+const cacheOf = r => (r.cacheCreate || 0) + (r.cacheRead || 0);
 
+/* ---- blocs reutilisables (tableau de bord global + vue par appareil) ---- */
+function buildKpiSection(rows) {
   const now = new Date();
-  const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
-  const in30 = rows.filter(r => r.date >= d30.toISOString().slice(0, 10));
   const totalAll = rows.reduce((s, r) => s + totalTokens(r), 0);
   const costAll = rows.reduce((s, r) => s + costOf(r.model, r), 0);
-  const cacheOf = r => (r.cacheCreate || 0) + (r.cacheRead || 0);
-
   const todayStr = now.toISOString().slice(0, 10);
   const ydt = new Date(now); ydt.setDate(ydt.getDate() - 1);
   const yesterdayStr = ydt.toISOString().slice(0, 10);
@@ -640,15 +626,12 @@ function renderDashboard() {
   const projSetYesterday = new Set(rowsYesterday.map(r => r.projectKey));
   const projSetAll = new Set(rows.map(r => r.projectKey));
 
-  const modelsToday = [...aggregate(rowsToday, r => r.model).entries()].filter(([, t]) => totalTokens(t) > 0).sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
-
-  /* ---- KPI sparklines (7 derniers jours) ---- */
   const spTokens = dailySeries(rows, 7, rs => rs.reduce((s, r) => s + totalTokens(r), 0));
   const spCost = dailySeries(rows, 7, rs => rs.reduce((s, r) => s + costOf(r.model, r), 0));
   const spCache = dailySeries(rows, 7, rs => rs.reduce((s, r) => s + cacheOf(r), 0));
   const spProjects = dailySeries(rows, 7, rs => new Set(rs.map(r => r.projectKey)).size);
 
-  const kpiHtml = `
+  return `
     <div class="kpi-grid">
       ${kpiCard({
         icon: "◆", iconBg: "linear-gradient(135deg,#e08a3c,#c9622a)", sparkColor: "#c9622a",
@@ -676,8 +659,9 @@ function renderDashboard() {
       })}
     </div>
   `;
+}
 
-  /* ---- trend chart (tokens vs cout, periode choisie) ---- */
+function buildTrendCard(rows) {
   const period = state.trendPeriod;
   const trendTok = dailySeries(rows, period, rs => rs.reduce((s, r) => s + totalTokens(r), 0));
   const trendCost = dailySeries(rows, period, rs => rs.reduce((s, r) => s + costOf(r.model, r), 0));
@@ -690,7 +674,7 @@ function renderDashboard() {
   const trendPct = state.trendMetric === "tokens" ? pctChange(curTok, prevTok) : pctChange(curCost, prevCost);
   const trendUp = trendPct >= 0;
 
-  const trendCard = `
+  return `
     <div class="card" style="margin-bottom:0">
       <div class="trend-head">
         <div class="trend-head-title">
@@ -718,14 +702,12 @@ function renderDashboard() {
         <button class="link-arrow" id="btn-scroll-detail">Voir le détail →</button>
       </div>
     </div>`;
+}
 
-  /* ---- repartition par projet (30 jours) ---- */
-  const byProject = aggregate(in30, r => r.projectKey);
-  const projectEntries = [...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
-  const projectTotal30 = projectEntries.reduce((s, [, t]) => s + totalTokens(t), 0);
+function buildDonutCard(projectEntries) {
+  const projectTotal = projectEntries.reduce((s, [, t]) => s + totalTokens(t), 0);
   const projColors = ["var(--accent)", "var(--violet)", "#c9622a", "var(--bad)"];
-
-  const donutCard = `
+  return `
     <div class="card" style="margin-bottom:0">
       <div class="trend-head">
         <div class="trend-head-title">
@@ -739,13 +721,13 @@ function renderDashboard() {
             ${donutSvg(projectEntries, projColors)}
             <div class="donut-center-label" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
               <div class="dc-total">Total</div>
-              <div class="dc-value">${fmtCompact(projectTotal30)}</div>
+              <div class="dc-value">${fmtCompact(projectTotal)}</div>
               <div class="dc-unit">tokens</div>
             </div>
           </div>
           <div class="legend-table">
             <div class="lt-head"><span>Projet</span><span>Tokens</span><span>%</span></div>
-            ${projectEntries.length ? projectLegendTable(projectEntries, projectTotal30, projColors) : emptyMini()}
+            ${projectEntries.length ? projectLegendTable(projectEntries, projectTotal, projColors) : emptyMini()}
           </div>
         </div>
       </div>
@@ -753,8 +735,18 @@ function renderDashboard() {
         <button class="link-arrow" data-nav="projects">Voir tous les projets →</button>
       </div>
     </div>`;
+}
 
-  /* ---- agent / synchro / activite ---- */
+function buildDetailTableCard(projectEntries, in30) {
+  return `
+    <div class="card" id="detail-table">
+      <div class="card-head"><h3>Détail par projet</h3><span class="hint">30 derniers jours, coût estimé</span></div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Projet</th><th>Client</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th><th class="num">Coût est.</th></tr></thead>
+          <tbody>
+            ${projectEntries.map(([pkey, t]) => {
+              const proj = projectForKey(pkey);
   const agentSeen = agentStatus().seen;
   const agentCard = `
     <div class="card deco-card" style="margin-bottom:0;padding:16px">
