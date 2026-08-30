@@ -10,7 +10,7 @@ require("dotenv").config({ path: ENV_PATH }); // n'ecrase jamais des variables d
 const express = require("express");
 const { db, uid } = require("./db");
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3333;
 const CRM_USER = process.env.CRM_USER || "admin";
 const CRM_PASSWORD = process.env.CRM_PASSWORD;
 const SYNC_API_KEY = process.env.SYNC_API_KEY;

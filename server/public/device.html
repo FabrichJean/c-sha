@@ -131,7 +131,9 @@ const state = {
   data: null,
   refreshing: false, refreshStartedAt: null, refreshAttempts: 0,
   trendMetric: "tokens", trendPeriod: 7,
+  detailSearch: "", detailPage: 0,
 };
+const DETAIL_PAGE_SIZE = 12;
 
 const DEFAULT_PRICING = {
   models: {
@@ -221,6 +223,56 @@ function dailySeries(rows, days, reducer) {
   return { dates, values: dates.map(d => reducer(byDate.get(d) || [])) };
 }
 function emptyMini() { return `<div style="padding:20px 0;text-align:center;color:var(--ink-faint)">Pas de données sur cette période.</div>`; }
+
+function buildDetailTableCard(projectEntries, in30) {
+  const resolved = projectEntries.map(([pkey, t]) => {
+    const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
+    return { pkey, name: projectName(pkey), t, cost };
+  });
+
+  const q = state.detailSearch.trim().toLowerCase();
+  const filtered = q ? resolved.filter(r => r.name.toLowerCase().includes(q)) : resolved;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / DETAIL_PAGE_SIZE));
+  const page = Math.min(state.detailPage, totalPages - 1);
+  const pageRows = filtered.slice(page * DETAIL_PAGE_SIZE, (page + 1) * DETAIL_PAGE_SIZE);
+
+  return `
+    <div class="card">
+      <div class="trend-head">
+        <h3>Détail par projet</h3>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:12px;color:var(--ink-faint)">30 derniers jours, coût estimé</span>
+          <input type="search" id="detail-search-input" placeholder="Rechercher un projet…" value="${escapeHtml(state.detailSearch)}"
+            style="padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:var(--bg);color:var(--ink);font-size:12.5px;width:200px">
+        </div>
+      </div>
+      <div class="card-body" style="padding:0">
+        ${pageRows.length === 0 ? `<div class="empty" style="padding:30px 20px">Aucun projet ne correspond à la recherche.</div>` : `
+        <table>
+          <thead><tr><th>Projet</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th><th class="num">Coût est.</th></tr></thead>
+          <tbody>
+            ${pageRows.map(r => `<tr>
+                <td>${escapeHtml(r.name)}</td>
+                <td class="num mono">${fmtNum(r.t.input)}</td>
+                <td class="num mono">${fmtNum(r.t.output)}</td>
+                <td class="num mono">${fmtNum(r.t.cacheCreate + r.t.cacheRead)}</td>
+                <td class="num mono">${fmtNum(totalTokens(r.t))}</td>
+                <td class="num mono">${fmtUsd(r.cost)}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`}
+      </div>
+      ${filtered.length > 0 ? `
+      <div class="trend-foot">
+        <span style="font-size:12px;color:var(--ink-faint)">${filtered.length} projet${filtered.length > 1 ? "s" : ""}${q ? ` (sur ${resolved.length})` : ""} · page ${page + 1} / ${totalPages}</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn" style="padding:5px 10px;font-size:12px" id="detail-page-prev" ${page === 0 ? "disabled" : ""}>← Précédent</button>
+          <button class="btn" style="padding:5px 10px;font-size:12px" id="detail-page-next" ${page >= totalPages - 1 ? "disabled" : ""}>Suivant →</button>
+        </div>
+      </div>` : ""}
+    </div>`;
+}
 
 function sparklineSvg(values, color) {
   const w = 240, h = 34, pad = 3;
@@ -515,28 +567,7 @@ function render() {
       </div>
     </div>`;
 
-  const detailTable = `
-    <div class="card">
-      <div class="trend-head"><h3>Détail par projet</h3><span style="font-size:12px;color:var(--ink-faint)">30 derniers jours, coût estimé</span></div>
-      <div class="card-body" style="padding:0">
-        <table>
-          <thead><tr><th>Projet</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th><th class="num">Coût est.</th></tr></thead>
-          <tbody>
-            ${projectEntries.map(([pkey, t]) => {
-              const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
-              return `<tr>
-                <td>${escapeHtml(projectName(pkey))}</td>
-                <td class="num mono">${fmtNum(t.input)}</td>
-                <td class="num mono">${fmtNum(t.output)}</td>
-                <td class="num mono">${fmtNum(t.cacheCreate + t.cacheRead)}</td>
-                <td class="num mono">${fmtNum(totalTokens(t))}</td>
-                <td class="num mono">${fmtUsd(cost)}</td>
-              </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      </div>
-    </div>`;
+  const detailTable = buildDetailTableCard(projectEntries, in30);
 
   main.innerHTML = `
     ${head}
@@ -558,6 +589,22 @@ function wire() {
   });
   const periodSelect = document.getElementById("trend-period");
   if (periodSelect) periodSelect.onchange = () => { state.trendPeriod = parseInt(periodSelect.value, 10); render(); };
+
+  const detailSearchInput = document.getElementById("detail-search-input");
+  if (detailSearchInput) {
+    detailSearchInput.oninput = () => {
+      const pos = detailSearchInput.selectionStart;
+      state.detailSearch = detailSearchInput.value;
+      state.detailPage = 0;
+      render();
+      const el = document.getElementById("detail-search-input");
+      if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+    };
+  }
+  const detailPagePrev = document.getElementById("detail-page-prev");
+  if (detailPagePrev) detailPagePrev.onclick = () => { state.detailPage = Math.max(0, state.detailPage - 1); render(); };
+  const detailPageNext = document.getElementById("detail-page-next");
+  if (detailPageNext) detailPageNext.onclick = () => { state.detailPage++; render(); };
 }
 
 async function handleRefresh() {
