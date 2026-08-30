@@ -1350,6 +1350,45 @@ async function handleDeviceRefreshClick(deviceId) {
   state.deviceRefreshStartedAt = Date.now();
   state.deviceRefreshAttempts = 0;
   render();
+  try {
+    await api("/api/devices/" + deviceId + "/request-sync", { method: "POST" });
+  } catch (e) {
+    toast("Erreur : " + e.message);
+    state.deviceRefreshing = false;
+    render();
+    return;
+  }
+
+  const deadline = Date.now() + 3 * 60 * 1000; // 3 min max
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 3000));
+    state.deviceRefreshAttempts++;
+    try {
+      const data = await api("/api/state");
+      state.devices = data.devices || [];
+      const newImportedAt = (data.usage || []).filter(u => u.deviceId === deviceId).reduce((max, u) => !max || u.importedAt > max ? u.importedAt : max, null);
+      if (newImportedAt && newImportedAt !== previousImportedAt) {
+        state.clients = data.clients || [];
+        state.projects = data.projects || [];
+        state.usage = data.usage || [];
+        state.pricing = data.pricing || DEFAULT_PRICING;
+        state.lastSync = data.lastSync || null;
+        state.deviceRefreshing = false;
+        render();
+        toast("Données à jour");
+        return;
+      }
+      render(); // met a jour le compteur et le statut de l'appareil pendant l'attente
+    } catch (e) { /* on reessaiera au prochain tick */ }
+  }
+  state.deviceRefreshing = false;
+  render();
+  const device = state.devices.find(d => d.id === deviceId);
+  toast(device && deviceStatus(device).seen
+    ? "L'appareil répond mais n'a pas encore terminé — réessaie dans une minute"
+    : "Cet appareil ne répond pas — vérifie que son agent tourne toujours");
+}
+
 /* ---------------- manual import fallback ---------------- */
 async function handleImportManual() {
   const raw = document.getElementById("import-json").value.trim();
@@ -1375,6 +1414,8 @@ function wireView() {
 
   const refreshBtn = document.getElementById("btn-refresh");
   if (refreshBtn) refreshBtn.onclick = handleRefreshClick;
+  const refreshDeviceBtn = document.getElementById("btn-refresh-device");
+  if (refreshDeviceBtn) refreshDeviceBtn.onclick = () => handleDeviceRefreshClick(refreshDeviceBtn.dataset.refreshDevice);
 
   document.querySelectorAll("[data-trend-metric]").forEach(el => {
     el.onclick = () => { state.trendMetric = el.dataset.trendMetric; render(); };
