@@ -1119,6 +1119,69 @@ function invoiceModal() {
         const pid = input.dataset.hoursFor;
         const project = projects.find(p => p.id === pid);
         const amount = (parseFloat(input.value) || 0) * (project.rate || 0);
+        document.getElementById("m-line-amount-" + pid).textContent = fmtUsd(amount);
+        document.getElementById("m-line-amount-" + pid).dataset.fixedAmount = amount;
+        updateTotal();
+      };
+    });
+    saveBtn.disabled = false;
+    updateTotal();
+  }
+
+  function updateTotal() {
+    const amounts = [...document.querySelectorAll("[id^='m-line-amount-']")].map(el => parseFloat(el.dataset.fixedAmount) || 0);
+    document.getElementById("m-inv-total").textContent = fmtUsd(amounts.reduce((a, b) => a + b, 0));
+  }
+
+  document.getElementById("m-inv-client").onchange = recomputeLines;
+  document.getElementById("m-inv-month").onchange = recomputeLines;
+
+  document.getElementById("m-save").onclick = async () => {
+    const { clientId, projects } = currentLines();
+    const month = document.getElementById("m-inv-month").value;
+    const { start, end } = monthBounds(month);
+    const lineItems = projects.map(p => {
+      const amountEl = document.getElementById("m-line-amount-" + p.id);
+      const amount = parseFloat(amountEl.dataset.fixedAmount) || 0;
+      if (p.billingMode === "hourly") {
+        const hours = parseFloat(document.querySelector(`[data-hours-for="${p.id}"]`).value) || 0;
+        return { projectId: p.id, projectName: p.name, billingMode: "hourly", hours, rate: p.rate || 0, amount };
+      }
+      const { tokens } = computeTokenCostForProject(p, start, end);
+      return { projectId: p.id, projectName: p.name, billingMode: "tokens", tokens, amount };
+    });
+    const total = lineItems.reduce((s, l) => s + l.amount, 0);
+    try {
+      await api("/api/invoices", { method: "POST", body: JSON.stringify({ clientId, periodStart: start, periodEnd: end, lineItems, total }) });
+      closeModal();
+      toast("Facture créée");
+      await loadState();
+    } catch (e) { toast("Erreur : " + e.message); }
+  };
+}
+
+function renderInvoiceDetail() {
+  const inv = state.invoices.find(i => i.id === state.selectedInvoiceId);
+  if (!inv) { state.view = "invoices"; return renderInvoices(); }
+  const client = state.clients.find(c => c.id === inv.clientId);
+  return `
+    <div class="pagehead">
+      <div>
+        <button class="link-arrow" data-nav="invoices" style="margin-bottom:8px;display:inline-block">← Factures</button>
+        <h1>Facture — ${escapeHtml(client ? client.name : "Client supprimé")}</h1>
+        <div class="desc">Période du ${inv.periodStart} au ${inv.periodEnd} · document à usage interne, non fiscal</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="btn-print-invoice">Imprimer</button>
+        <button class="btn ghost" data-del-invoice="${inv.id}">Supprimer</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px">
+        <div style="display:flex;gap:28px;flex-wrap:wrap">
+          <div><div class="hint" style="color:var(--ink-faint)">Client</div><div style="font-size:14px;font-weight:620">${escapeHtml(client ? client.name : "—")}</div></div>
+          <div><div class="hint" style="color:var(--ink-faint)">Société</div><div style="font-size:14px">${escapeHtml((client && client.company) || "—")}</div></div>
 /* ---- devices ---- */
 function deviceStatus(device) {
   if (!device.lastSeen) return { seen: false, historic: true, label: "Historique" };
