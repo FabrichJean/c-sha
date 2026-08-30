@@ -38,9 +38,14 @@ if [ -f "$DIR/device.conf" ]; then
   source "$DIR/device.conf"
 fi
 urlencode() { python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$1"; }
+DEVICE_QS=""
+[ -n "$DEVICE_ID" ] && DEVICE_QS="?deviceId=$(urlencode "$DEVICE_ID")&deviceName=$(urlencode "$DEVICE_NAME")"
+
 do_sync() {
   local reason="$1"
-  PAYLOAD="$(python3 "$DIR/export_usage.py" --days 90 2>>"$LOG_DIR/sync.log")"
+  local device_args=()
+  [ -n "$DEVICE_ID" ] && device_args=(--device-id "$DEVICE_ID" --device-name "$DEVICE_NAME")
+  PAYLOAD="$(python3 "$DIR/export_usage.py" --days 90 "${device_args[@]}" 2>>"$LOG_DIR/sync.log")"
   HTTP_CODE=$(curl -sS -o "$LOG_DIR/last_response.json" -w "%{http_code}" \
     -X POST "$BASE_URL/api/sync" \
     -H "Authorization: Bearer $LEDGER_API_KEY" \
@@ -56,7 +61,7 @@ do_sync() {
 }
 
 # 1) Une synchro a-t-elle ete demandee depuis le CRM ("Rafraichir") ?
-STATUS_JSON="$(curl -sS -m 8 "$BASE_URL/api/sync-status" -H "Authorization: Bearer $LEDGER_API_KEY" || echo '{}')"
+STATUS_JSON="$(curl -sS -m 8 "$BASE_URL/api/sync-status$DEVICE_QS" -H "Authorization: Bearer $LEDGER_API_KEY" || echo '{}')"
 REQUESTED="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('requested', False))" "$STATUS_JSON" 2>/dev/null || echo "False")"
 
 if [ "$REQUESTED" = "True" ]; then
