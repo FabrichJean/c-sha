@@ -293,6 +293,41 @@ function widget({ icon, iconBg, badgePct, title, periods, breakdown, breakdownEm
         <span class="w-label">${escapeHtml(b.label)}</span>
         <div>
           <div class="w-value">${b.value}</div>
+          ${b.sub !== undefined ? `<div class="w-sub">${b.sub}</div>` : ""}
+        </div>
+      </div>`).join("")
+    : `<div class="widget-empty-row">${breakdownEmptyLabel || "Pas de détail sur cette période"}</div>`;
+
+  return `
+    <div class="widget">
+      <div class="widget-top">
+        <div class="widget-icon" style="background:${iconBg}">${icon}</div>
+        ${widgetBadge(badgePct)}
+      </div>
+      <div class="widget-title">${escapeHtml(title)}</div>
+      <div class="widget-periods">${periodsHtml}</div>
+      <div class="widget-breakdown">${rowsHtml}</div>
+    </div>`;
+}
+
+function statWidget({ icon, iconBg, badgePct, title, big, desc, foot }) {
+  return `
+    <div class="widget stat">
+      <div>
+        <div class="widget-top">
+          <div class="widget-icon" style="background:${iconBg}">${icon}</div>
+          ${widgetBadge(badgePct)}
+        </div>
+        <div class="widget-title">${escapeHtml(title)}</div>
+        ${desc ? `<div class="stat-desc">${escapeHtml(desc)}</div>` : ""}
+      </div>
+      <div>
+        <div class="stat-big">${big}</div>
+        ${foot ? `<div class="stat-foot">${foot}</div>` : ""}
+      </div>
+    </div>`;
+}
+
 function pricingFor(model) {
   const p = state.pricing || DEFAULT_PRICING;
   return p.models[model] || p.fallback || DEFAULT_PRICING.fallback;
@@ -417,6 +452,98 @@ function renderDashboard() {
   const costAll = rows.reduce((s, r) => s + costOf(r.model, r), 0);
   const activeProjects = new Set(in30.map(r => r.projectKey)).size;
 
+  /* ---- widgets: aujourd'hui / hier / total ---- */
+  const todayStr = now.toISOString().slice(0, 10);
+  const ydt = new Date(now); ydt.setDate(ydt.getDate() - 1);
+  const yesterdayStr = ydt.toISOString().slice(0, 10);
+  const rowsToday = rows.filter(r => r.date === todayStr);
+  const rowsYesterday = rows.filter(r => r.date === yesterdayStr);
+
+  const tokTotal = { today: rowsToday.reduce((s, r) => s + totalTokens(r), 0), yest: rowsYesterday.reduce((s, r) => s + totalTokens(r), 0), all: totalAll };
+  const costTotal = { today: rowsToday.reduce((s, r) => s + costOf(r.model, r), 0), yest: rowsYesterday.reduce((s, r) => s + costOf(r.model, r), 0), all: costAll };
+  const cacheOf = r => (r.cacheCreate || 0) + (r.cacheRead || 0);
+  const cacheTotal = { today: rowsToday.reduce((s, r) => s + cacheOf(r), 0), yest: rowsYesterday.reduce((s, r) => s + cacheOf(r), 0), all: rows.reduce((s, r) => s + cacheOf(r), 0) };
+
+  const modelsToday = [...aggregate(rowsToday, r => r.model).entries()].filter(([, t]) => totalTokens(t) > 0).sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
+  const projSetToday = new Set(rowsToday.map(r => r.projectKey));
+  const projSetYesterday = new Set(rowsYesterday.map(r => r.projectKey));
+  const projSetAll = new Set(rows.map(r => r.projectKey));
+  const topProjectsToday = [...aggregate(rowsToday, r => r.projectKey).entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1])).slice(0, 4);
+  const maxTopProjectVal = Math.max(1, ...topProjectsToday.map(([, v]) => totalTokens(v)));
+  const projectPalette = ["var(--accent)", "var(--violet)", "var(--warn)", "var(--bad)"];
+
+  const widgetsHtml = `
+    <div class="widget-grid">
+      ${widget({
+        icon: "◆", iconBg: "linear-gradient(135deg,#e08a3c,#c9622a)",
+        badgePct: pctChange(tokTotal.today, tokTotal.yest),
+        title: "Tokens",
+        periods: [
+          { label: "Aujourd'hui", value: fmtCompact(tokTotal.today) },
+          { label: "Hier", value: fmtCompact(tokTotal.yest) },
+          { label: "Total", value: fmtCompact(tokTotal.all) },
+        ],
+        breakdown: modelsToday.map(([m, t]) => ({ color: colorForModel(m), label: modelLabel(m), value: fmtCompact(totalTokens(t)), sub: fmtUsd(costOf(m, t)) })),
+        breakdownEmptyLabel: "Aucun token aujourd'hui",
+      })}
+      ${widget({
+        icon: "$", iconBg: "linear-gradient(135deg,#3f8f6e,#276b52)",
+        badgePct: pctChange(costTotal.today, costTotal.yest),
+        title: "Coût estimé",
+        periods: [
+          { label: "Aujourd'hui", value: fmtUsd(costTotal.today) },
+          { label: "Hier", value: fmtUsd(costTotal.yest) },
+          { label: "Total", value: fmtUsd(costTotal.all) },
+        ],
+        breakdown: modelsToday.map(([m, t]) => ({ color: colorForModel(m), label: modelLabel(m), value: fmtUsd(costOf(m, t)) })),
+        breakdownEmptyLabel: "Aucun coût aujourd'hui",
+      })}
+      ${widget({
+        icon: "▤", iconBg: "linear-gradient(135deg,#6a5aa8,#4a3c80)",
+        badgePct: pctChange(cacheTotal.today, cacheTotal.yest),
+        title: "Cache",
+        periods: [
+          { label: "Aujourd'hui", value: fmtCompact(cacheTotal.today) },
+          { label: "Hier", value: fmtCompact(cacheTotal.yest) },
+          { label: "Total", value: fmtCompact(cacheTotal.all) },
+        ],
+        breakdown: [
+          { color: "var(--accent)", label: "Lecture cache", value: fmtCompact(rowsToday.reduce((s, r) => s + (r.cacheRead || 0), 0)) },
+          { color: "var(--violet)", label: "Écriture cache", value: fmtCompact(rowsToday.reduce((s, r) => s + (r.cacheCreate || 0), 0)) },
+        ],
+      })}
+      ${widget({
+        icon: "◇", iconBg: "linear-gradient(135deg,#4a7fb5,#345f8c)",
+        badgePct: pctChange(projSetToday.size, projSetYesterday.size),
+        title: "Projets actifs",
+        periods: [
+          { label: "Aujourd'hui", value: projSetToday.size },
+          { label: "Hier", value: projSetYesterday.size },
+          { label: "Total suivis", value: projSetAll.size },
+        ],
+        breakdown: topProjectsToday.map(([pkey, t], i) => {
+          const proj = projectForKey(pkey);
+          return { color: projectPalette[i % projectPalette.length], label: proj ? proj.name : pkey, value: fmtCompact(totalTokens(t)) };
+        }),
+        breakdownEmptyLabel: "Aucun projet actif aujourd'hui",
+      })}
+      ${statWidget({
+        icon: "●", iconBg: agentStatus().seen ? "linear-gradient(135deg,#2f8f5b,#206b41)" : "linear-gradient(135deg,#b9791f,#8f5c14)",
+        title: "Agent local",
+        desc: agentStatus().seen ? "Connecté à cette machine" : "Aucun contact récent",
+        big: `<span class="widget-live ${agentStatus().seen ? "on" : "off"}"><span class="w-pulse"></span>${agentStatus().seen ? "Actif" : "Hors ligne"}</span>`,
+        foot: state.agentLastSeen ? `Dernier contact : ${new Date(state.agentLastSeen).toLocaleTimeString("fr-FR")}` : "Jamais contacté",
+      })}
+      ${statWidget({
+        icon: "↻", iconBg: "linear-gradient(135deg,#8a5cc9,#5f3c96)",
+        title: "Dernière synchro",
+        desc: state.lastSync ? `${state.lastSync.written} enregistrement(s)` : "En attente du premier envoi",
+        big: state.lastSync ? new Date(state.lastSync.at).toLocaleTimeString("fr-FR") : "—",
+        foot: state.lastSync ? new Date(state.lastSync.at).toLocaleDateString("fr-FR") : "",
+      })}
+    </div>
+  `;
+
   const byDate = aggregate(in30, r => r.date);
   const dates = [];
   for (let i = 29; i >= 0; i--) { const dt = new Date(now); dt.setDate(dt.getDate() - i); dates.push(dt.toISOString().slice(0, 10)); }
@@ -442,12 +569,7 @@ function renderDashboard() {
 
     ${refreshProgressBanner()}
 
-    <div class="tiles">
-      <div class="tile"><div class="label">7 derniers jours</div><div class="value">${fmtCompact(total7)}</div><div class="sub">tokens</div></div>
-      <div class="tile"><div class="label">30 derniers jours</div><div class="value accent">${fmtCompact(total30)}</div><div class="sub">≈ ${fmtUsd(cost30)}</div></div>
-      <div class="tile"><div class="label">Total cumulé</div><div class="value">${fmtCompact(totalAll)}</div><div class="sub">≈ ${fmtUsd(costAll)} au total</div></div>
-      <div class="tile"><div class="label">Projets actifs (30j)</div><div class="value violet">${activeProjects}</div><div class="sub">sur ${state.projects.length || "–"} suivis</div></div>
-    </div>
+    ${widgetsHtml}
 
     <div class="card">
       <div class="card-head"><h3>Tokens par jour · 30 derniers jours</h3><span class="hint">total (input + output + cache)</span></div>
