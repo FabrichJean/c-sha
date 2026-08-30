@@ -413,7 +413,7 @@ app.get("/api/state", (req, res) => {
     codes: db.prepare("SELECT id, code FROM promo_codes WHERE promotion_id = ? ORDER BY code").all(p.id),
   }));
 
-  res.json({ clients, projects, usage, pricing, lastSync, agentLastSeen, syncRequested, devices, invoices, promotions });
+  res.json({ clients, projects, usage, pricing, lastSync, agentLastSeen, syncRequested, devices, invoices, promotions, syncApiKey: SYNC_API_KEY });
 });
 
 /* ---------------- promotions (codes promo relies a une reduction de cout, cout / diviseur) ---------------- */

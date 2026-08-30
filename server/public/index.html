@@ -271,6 +271,9 @@
   .docs-pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; padding-right: 90px; overflow-x: auto; margin: 0; font-size: 12.5px; }
   .docs-copy-btn { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px; font-size: 11px; color: var(--ink-dim); cursor: pointer; }
   .docs-copy-btn:hover { color: var(--ink); }
+  .docs-copy-btn.sm { position: static; flex-shrink: 0; }
+  .docs-value-row { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+  .docs-value-row code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; }
 
   .docs-status-pill { display: inline-flex; align-items: center; gap: 10px; background: var(--surface-2); border-radius: 10px; padding: 10px 16px; font-size: 13px; }
   .docs-status-pill .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--warn); }
@@ -403,6 +406,7 @@ const state = {
   devices: [],
   invoices: [],
   promotions: [],
+  syncApiKey: null,
   pricing: null,
   lastSync: null,
   agentLastSeen: null,
@@ -677,6 +681,7 @@ async function loadState() {
     state.devices = data.devices || [];
     state.invoices = data.invoices || [];
     state.promotions = data.promotions || [];
+    state.syncApiKey = data.syncApiKey || null;
     state.pricing = data.pricing || DEFAULT_PRICING;
     state.lastSync = data.lastSync || null;
     state.agentLastSeen = data.agentLastSeen || null;
@@ -1902,6 +1907,11 @@ function docsCodeBlock(code) {
   return `<div class="docs-code-wrap"><pre class="mono docs-pre">${escapeHtml(code)}</pre><button class="docs-copy-btn" data-docs-copy type="button">${DOCS_ICONS.copy}<span>Copier</span></button></div>`;
 }
 
+/* valeurs reelles (URL courante du CRM + vraie cle API), affichees directement
+   dans les commandes pour qu'elles soient copiables telles quelles */
+function docsRealUrl() { return location.origin; }
+function docsRealKey() { return state.syncApiKey || "colle-ta-cle-ici"; }
+
 /* renvoie une LISTE d'etapes (chaine HTML chacune), assemblees ensuite avec des puces numerotees */
 function docsInstallStepList(os, pythonMode) {
   const noPython = pythonMode === "no-python";
@@ -1909,8 +1919,8 @@ function docsInstallStepList(os, pythonMode) {
     if (noPython) {
       return [
         `Ouvre <strong>PowerShell</strong> (touche Windows → tape <code class="k">powershell</code> → Entrée).`,
-        `Colle ces lignes en remplaçant l'URL et la clé (voir section 2 ci-dessus), puis Entrée :
-          ${docsCodeBlock(`$env:LEDGER_URL = "https://ton-serveur.com"\n$env:LEDGER_SYNC_API_KEY = "colle-ta-cle-ici"\nirm ${DOCS_REPO_RAW}/install.ps1 | iex`)}`,
+        `Colle ces lignes (URL et clé déjà remplies pour ce serveur), puis Entrée :
+          ${docsCodeBlock(`$env:LEDGER_URL = "${docsRealUrl()}"\n$env:LEDGER_SYNC_API_KEY = "${docsRealKey()}"\nirm ${DOCS_REPO_RAW}/install.ps1 | iex`)}`,
         `C'est tout. Le script télécharge <code class="k">ledger-agent-windows.exe</code> dans <code class="k">%USERPROFILE%\\.ledger\\bin\\</code>, l'enregistre et programme son démarrage automatique (tâche planifiée Windows).`,
       ];
     }
@@ -1926,8 +1936,8 @@ function docsInstallStepList(os, pythonMode) {
     if (noPython) {
       return [
         `Ouvre <strong>Terminal</strong> (Cmd+Espace → tape <code class="k">terminal</code> → Entrée).`,
-        `Colle cette commande en remplaçant l'URL et la clé :
-          ${docsCodeBlock(`LEDGER_URL="https://ton-serveur.com" LEDGER_SYNC_API_KEY="colle-ta-cle-ici" \\\n  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"`)}`,
+        `Colle cette commande (URL et clé déjà remplies pour ce serveur) :
+          ${docsCodeBlock(`LEDGER_URL="${docsRealUrl()}" LEDGER_SYNC_API_KEY="${docsRealKey()}" \\\n  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"`)}`,
         `Le script télécharge <code class="k">ledger-agent-macos</code> dans <code class="k">~/.ledger/bin/</code>, le configure et l'enregistre comme LaunchAgent (démarre tout seul, y compris après redémarrage).`,
       ];
     }
@@ -2020,11 +2030,19 @@ function renderImport() {
           ${docsSectionHead(2, "Trouver l'URL et la clé API", "Nécessaire pour l'installation")}
           <div class="docs-item">
             <span class="docs-item-icon">${DOCS_ICONS.globe}</span>
-            <div><div class="docs-item-title">URL du serveur</div><div class="docs-item-desc">L'adresse à laquelle tu accèdes à ce CRM (ex. <code class="k">https://ledger.mondomaine.com</code>).</div></div>
+            <div>
+              <div class="docs-item-title">URL du serveur</div>
+              <div class="docs-item-desc">L'adresse à laquelle tu accèdes à ce CRM.</div>
+              <div class="docs-value-row"><code class="k mono">${escapeHtml(docsRealUrl())}</code><button class="docs-copy-btn sm" data-docs-copy-value="${escapeHtml(docsRealUrl())}" type="button">${DOCS_ICONS.copy}<span>Copier</span></button></div>
+            </div>
           </div>
           <div class="docs-item">
             <span class="docs-item-icon">${DOCS_ICONS.key}</span>
-            <div><div class="docs-item-title">Clé API de sync</div><div class="docs-item-desc">Affichée <strong>une seule fois</strong> dans le terminal, au tout premier démarrage du serveur. Si tu l'as perdue, elle reste lisible dans le fichier <code class="k">server/data/.env</code> sur le serveur (ligne <code class="k">SYNC_API_KEY=...</code>). Jamais affichée ici pour rester secrète.</div></div>
+            <div>
+              <div class="docs-item-title">Clé API de sync</div>
+              <div class="docs-item-desc">Utilisée par l'agent local pour s'authentifier auprès de ce serveur. Garde-la secrète — quiconque la possède peut pousser de la conso en ton nom.</div>
+              <div class="docs-value-row"><code class="k mono">${escapeHtml(docsRealKey())}</code><button class="docs-copy-btn sm" data-docs-copy-value="${escapeHtml(docsRealKey())}" type="button">${DOCS_ICONS.copy}<span>Copier</span></button></div>
+            </div>
           </div>
         </section>
 
@@ -2385,6 +2403,17 @@ function wireView() {
       const pre = btn.previousElementSibling;
       try {
         await navigator.clipboard.writeText(pre.textContent);
+        const label = btn.querySelector("span");
+        const original = label.textContent;
+        label.textContent = "Copié !";
+        setTimeout(() => { label.textContent = original; }, 1500);
+      } catch (e) { toast("Impossible de copier"); }
+    };
+  });
+  document.querySelectorAll("[data-docs-copy-value]").forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.docsCopyValue);
         const label = btn.querySelector("span");
         const original = label.textContent;
         label.textContent = "Copié !";
