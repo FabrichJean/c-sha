@@ -118,6 +118,9 @@ app.post("/api/sync", requireApiKey, (req, res) => {
 /* le script local interroge ceci pour savoir s'il doit pousser tout de suite
    (au lieu d'attendre son prochain passage planifie) */
 app.get("/api/sync-status", requireApiKey, (req, res) => {
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('agent_last_seen', @v) ON CONFLICT(key) DO UPDATE SET value = @v`)
+    .run({ v: JSON.stringify(now) });
   res.json({ requested: !!getSyncRequest(), requestedAt: getSyncRequest() });
 });
 
@@ -151,6 +154,7 @@ app.get("/api/state", (req, res) => {
   const pricing = pricingRow ? JSON.parse(pricingRow.value) : null;
   const lastSyncRow = db.prepare("SELECT value FROM settings WHERE key = 'last_sync'").get();
   const lastSync = lastSyncRow ? JSON.parse(lastSyncRow.value) : null;
+  const agentSeenRow = db.prepare("SELECT value FROM settings WHERE key = 'agent_last_seen'").get();
 
   res.json({ clients, projects, usage, pricing, lastSync });
 });
