@@ -368,6 +368,20 @@ function buildBillingCard() {
           <div><div class="il">Payé</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px;color:var(--good)">${fmtUsd(b.totalPaid)}</div></div>
           <div><div class="il">Restant</div><div class="mono" style="font-size:18px;font-weight:650;margin-top:2px;color:${b.totalPending > 0 ? "var(--warn)" : "var(--ink-faint)"}">${fmtUsd(b.totalPending)}</div></div>
         </div>
+        <table>
+          <thead><tr><th>Date</th><th>Statut</th><th class="num">Montant</th></tr></thead>
+          <tbody>
+            ${b.entries.map(e => `<tr>
+              <td class="mono">${new Date(e.date).toLocaleDateString("fr-FR")}</td>
+              <td><span class="dot" style="width:7px;height:7px;border-radius:50%;display:inline-block;background:${INVOICE_STATUS_COLORS[e.status]};margin-right:6px"></span>${INVOICE_STATUS_LABELS[e.status] || e.status}</td>
+              <td class="num mono">${fmtUsd(e.amount)}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
 function render() {
   if (!state.data) return;
   const d = state.data.device;
@@ -387,6 +401,7 @@ function render() {
       ${d.lastSeen ? `<div class="info-item"><div class="il">Dernier contact</div><div class="iv">${timeAgo(d.lastSeen)}</div></div>` : ""}
       <div class="info-item"><div class="il">Dernière donnée reçue</div><div class="iv">${state.data.lastDataAt ? timeAgo(state.data.lastDataAt) : "—"}</div></div>
     </div></div>
+    ${buildBillingCard()}
     ${refreshBanner()}
   `;
 
