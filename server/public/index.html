@@ -1478,7 +1478,7 @@ function renderDevices() {
         <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">python3 configure_sync.py
 python3 install_autosync.py</pre>
         <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Un identifiant unique est généré au premier <code class="k">install_autosync.py</code> et réutilisé ensuite — pas besoin de le créer ici. Sur Windows, remplace <code class="k">python3</code> par <code class="k">python</code>.</p>
-        <p style="margin:8px 0 0;color:var(--ink-dim);font-size:12.5px">Pas de Python installé ? Sur macOS/Linux : <code class="k">curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.sh | bash</code>. Sur Windows (PowerShell) : <code class="k">irm https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.ps1 | iex</code>. Ça télécharge le binaire et lance configure+install automatiquement.</p>
+        <p style="margin:8px 0 0;color:var(--ink-dim);font-size:12.5px">Pas de Python installé ? Sur macOS/Linux : <code class="k">LEDGER_URL=... LEDGER_SYNC_API_KEY=... bash -c "$(curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.sh)"</code>. Sur Windows (PowerShell), définis <code class="k">$env:LEDGER_URL</code>/<code class="k">$env:LEDGER_SYNC_API_KEY</code> puis <code class="k">irm https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.ps1 | iex</code>. Ça télécharge le binaire et lance configure+install sans prompt.</p>
       </div>
     </div>
 
@@ -1584,7 +1584,7 @@ function renderImport() {
         <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">python3 configure_sync.py
 python3 install_autosync.py</pre>
         <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Fonctionne à l'identique sur Windows, macOS et Linux (Python standard, aucune dépendance). Rien à faire de ton côté une fois installé — cette page se met à jour toute seule.</p>
-        <p style="margin:8px 0 0;color:var(--ink-dim);font-size:12.5px">Pas de Python installé ? Une seule commande suffit — macOS/Linux : <code class="k">curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.sh | bash</code>. Windows (PowerShell) : <code class="k">irm https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.ps1 | iex</code>. Elle télécharge le binaire de la dernière Release et lance configure+install directement.</p>
+        <p style="margin:8px 0 0;color:var(--ink-dim);font-size:12.5px">Pas de Python installé ? macOS/Linux : <code class="k">LEDGER_URL=... LEDGER_SYNC_API_KEY=... bash -c "$(curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.sh)"</code> (les variables évitent les prompts, indispensable via curl|bash). Windows : définis <code class="k">$env:LEDGER_URL</code>/<code class="k">$env:LEDGER_SYNC_API_KEY</code> puis <code class="k">irm https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.ps1 | iex</code>.</p>
       </div>
     </div>
 

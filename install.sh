@@ -38,17 +38,21 @@ echo
 
 # Ce script est presque toujours lance via 'curl ... | bash' : dans ce cas,
 # stdin est deja consomme par le pipe (c'est le script lui-meme), donc les
-# prompts interactifs de 'configure' liraient EOF immediatement. On relit le
-# terminal directement via /dev/tty quand c'est possible.
-if exec 3</dev/tty 2>/dev/null; then
-  exec 3<&-
-  "$DEST_DIR/ledger-agent" configure < /dev/tty
+# prompts interactifs de 'configure' liraient EOF immediatement — et /dev/tty
+# n'est pas fiable partout (panels web, 'docker exec' sans -t, etc.). On passe
+# donc par les variables d'environnement LEDGER_URL / LEDGER_SYNC_API_KEY si
+# elles sont definies ; sinon on n'essaie pas de deviner et on affiche juste
+# les commandes a lancer soi-meme.
+if [ -n "${LEDGER_URL:-}" ] && [ -n "${LEDGER_SYNC_API_KEY:-}" ]; then
+  "$DEST_DIR/ledger-agent" configure
   "$DEST_DIR/ledger-agent" install
   echo
   echo "Termine. Pour resynchroniser/desinstaller : $DEST_DIR/ledger-agent sync|uninstall"
 else
-  echo "Aucun terminal interactif detecte (ex: SSH non-tty, script automatise)."
-  echo "Termine la configuration a la main :"
+  echo "Pour terminer, definis LEDGER_URL et LEDGER_SYNC_API_KEY puis relance ce script :"
+  echo "  LEDGER_URL=https://ton-serveur LEDGER_SYNC_API_KEY=ta_cle bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/$REPO/main/install.sh)\""
+  echo
+  echo "Ou configure a la main (marche toujours si tu as un terminal interactif) :"
   echo "  $DEST_DIR/ledger-agent configure"
   echo "  $DEST_DIR/ledger-agent install"
 fi

@@ -12,6 +12,7 @@ tout tienne dans un seul binaire fige.
 from __future__ import annotations
 
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -146,11 +147,25 @@ def main_sync() -> int:
 
 
 def main_configure() -> int:
-    url = input("URL du serveur Ledger (ex: https://ledger.mondomaine.com) : ").strip()
-    api_key = input("Cle API de sync (SYNC_API_KEY du serveur) : ").strip()
+    # LEDGER_URL / LEDGER_SYNC_API_KEY permettent une configuration non-interactive
+    # (scripts d'installation, terminaux sans TTY reel comme certains panels web
+    # ou 'docker exec' sans -t, ou l'ont deja en env pour ne pas re-saisir la cle).
+    url = os.environ.get("LEDGER_URL", "").strip()
+    api_key = os.environ.get("LEDGER_SYNC_API_KEY", "").strip()
+
+    if not url or not api_key:
+        try:
+            if not url:
+                url = input("URL du serveur Ledger (ex: https://ledger.mondomaine.com) : ").strip()
+            if not api_key:
+                api_key = input("Cle API de sync (SYNC_API_KEY du serveur) : ").strip()
+        except EOFError:
+            pass
 
     if not url or not api_key:
         print("URL et cle API sont requises.", file=sys.stderr)
+        print("Sans terminal interactif, definis-les en variables d'environnement, ex :", file=sys.stderr)
+        print("  LEDGER_URL=https://ledger.mondomaine.com LEDGER_SYNC_API_KEY=... python3 configure_sync.py", file=sys.stderr)
         return 1
 
     save_json(CONFIG_FILE, {"url": url, "apiKey": api_key})

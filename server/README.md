@@ -79,16 +79,30 @@ sans copier-coller, sans navigateur ouvert. Config et logs dans `~/.ledger/`
 ### Sans Python installé
 
 Une seule commande télécharge le binaire de la dernière Release GitHub
-correspondant à l'OS courant et lance directement `configure` puis `install` :
+correspondant à l'OS courant. `LEDGER_URL` et `LEDGER_SYNC_API_KEY` évitent les
+prompts interactifs — indispensable via `curl | bash`, où le pipe consomme déjà
+le stdin du script, et sur certains terminaux sans vrai TTY (panels web,
+`docker exec` sans `-t`, etc.) :
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.sh | bash
+LEDGER_URL="https://ton-serveur" LEDGER_SYNC_API_KEY="ta_cle" \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.sh)"
 ```
 
 ```powershell
 # Windows (PowerShell)
+$env:LEDGER_URL = "https://ton-serveur"; $env:LEDGER_SYNC_API_KEY = "ta_cle"
 irm https://raw.githubusercontent.com/FabrichJean/c-sha/main/install.ps1 | iex
+```
+
+Sans ces variables, le script télécharge quand même le binaire mais n'essaie
+plus de deviner s'il peut lire un prompt : il affiche juste les commandes à
+lancer soi-même (marche dans un terminal réellement interactif) :
+
+```bash
+~/.ledger/bin/ledger-agent configure
+~/.ledger/bin/ledger-agent install
 ```
 
 Le binaire est installé dans `~/.ledger/bin/` (`%USERPROFILE%\.ledger\bin\` sur
@@ -97,16 +111,6 @@ sync|uninstall`. Les binaires (`ledger-agent-macos`, `ledger-agent-linux`,
 `ledger-agent-windows.exe`) sont générés automatiquement par
 `.github/workflows/release.yml` à chaque tag `v*` poussé sur le dépôt — il faut
 qu'au moins une release existe avant de lancer ces scripts.
-
-**Terminal sans TTY** (rare — cron, CI, certains clients SSH non-interactifs) :
-`install.sh` détecte l'absence de terminal et saute `configure`/`install` en
-affichant les deux commandes à relancer toi-même une fois connecté normalement.
-Dans ce cas (ou si tu préfères configurer à la main) :
-
-```bash
-~/.ledger/bin/ledger-agent configure
-~/.ledger/bin/ledger-agent install
-```
 
 ## Variables d'environnement
 
