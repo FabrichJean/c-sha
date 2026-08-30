@@ -998,6 +998,14 @@ function renderDeviceDetail() {
         </div>
         ${device.hostname && device.hostname !== device.name ? `<div><div class="hint" style="color:var(--ink-faint)">Machine</div><div style="font-size:13px">${escapeHtml(device.hostname)}</div></div>` : ""}
         <div><div class="hint" style="color:var(--ink-faint)">Client</div><div style="font-size:13px">${escapeHtml(deviceClient ? deviceClient.name : "—")}</div></div>
+        ${deviceClient ? `
+        <div>
+          <div class="hint" style="color:var(--ink-faint)">Code promo (${escapeHtml(deviceClient.name)})</div>
+          <select id="device-client-promo" data-client-id="${deviceClient.id}" style="margin-top:3px;font-size:12.5px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink)">
+            <option value="">— aucun —</option>
+            ${allPromoCodes().map(pc => `<option value="${pc.id}" ${deviceClient.promoCodeId === pc.id ? "selected" : ""}>${escapeHtml(pc.code)} — ${escapeHtml(pc.promotionName)} (÷${pc.divisor})</option>`).join("")}
+          </select>
+        </div>` : ""}
         ${device.firstSeen ? `<div><div class="hint" style="color:var(--ink-faint)">Premier contact</div><div class="mono" style="font-size:13px">${new Date(device.firstSeen).toLocaleDateString("fr-FR")}</div></div>` : ""}
         ${device.lastSeen ? `<div><div class="hint" style="color:var(--ink-faint)">Dernier contact</div><div class="mono" style="font-size:13px">${timeAgo(device.lastSeen)}</div></div>` : ""}
         <div><div class="hint" style="color:var(--ink-faint)">Dernière donnée reçue</div><div class="mono" style="font-size:13px">${lastImported ? timeAgo(lastImported) : "—"}</div></div>
@@ -2233,6 +2241,23 @@ function wireView() {
   });
   const printInvoiceBtn = document.getElementById("btn-print-invoice");
   if (printInvoiceBtn) printInvoiceBtn.onclick = () => window.print();
+
+  const deviceClientPromoSelect = document.getElementById("device-client-promo");
+  if (deviceClientPromoSelect) {
+    deviceClientPromoSelect.onchange = async () => {
+      const clientId = deviceClientPromoSelect.dataset.clientId;
+      const client = state.clients.find(c => c.id === clientId);
+      if (!client) return;
+      try {
+        await api("/api/clients/" + clientId, { method: "PUT", body: JSON.stringify({
+          name: client.name, company: client.company, email: client.email, notes: client.notes,
+          promoCodeId: deviceClientPromoSelect.value || null,
+        }) });
+        toast("Code promo mis à jour");
+        await loadState();
+      } catch (e) { toast("Erreur : " + e.message); }
+    };
+  }
 
   const addPromotionBtn = document.getElementById("btn-add-promotion");
   if (addPromotionBtn) addPromotionBtn.onclick = () => promotionModal(null);
