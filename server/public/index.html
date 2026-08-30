@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledger</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;650;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #eef1ef;
+    --surface: #ffffff;
+    --surface-2: #e2e7e4;
+    --border: #cad3ce;
+    --ink: #142420;
+    --ink-dim: #52645d;
+    --ink-faint: #85958e;
+    --accent: #21705c;
+    --accent-ink: #ffffff;
+    --accent-soft: #dcece6;
+    --violet: #6a5aa8;
+    --violet-soft: #e6e2f2;
+    --good: #2f8f5b;
+    --warn: #b9791f;
+    --bad: #bd4636;
+    --bad-soft: #f7e2de;
+    --shadow: 0 1px 2px rgba(20,36,32,.06), 0 8px 24px -12px rgba(20,36,32,.18);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121815; --surface: #1a2320; --surface-2: #212c28; --border: #2e3b36;
+      --ink: #eaf2ee; --ink-dim: #a9bab3; --ink-faint: #728880;
+      --accent: #4bbf9c; --accent-ink: #0b1a15; --accent-soft: #1c332c;
+      --violet: #a598d6; --violet-soft: #29253d;
+      --good: #4bbf7e; --warn: #dba53f; --bad: #e07362; --bad-soft: #3a2420;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121815; --surface: #1a2320; --surface-2: #212c28; --border: #2e3b36;
+    --ink: #eaf2ee; --ink-dim: #a9bab3; --ink-faint: #728880;
+    --accent: #4bbf9c; --accent-ink: #0b1a15; --accent-soft: #1c332c;
+    --violet: #a598d6; --violet-soft: #29253d;
+    --good: #4bbf7e; --warn: #dba53f; --bad: #e07362; --bad-soft: #3a2420;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); margin: 0; }
+  body {
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { font-family: "IBM Plex Sans", sans-serif; text-wrap: balance; margin: 0; }
+  a { color: inherit; }
+  button { font-family: inherit; }
+
+  #app { display: flex; min-height: 100vh; }
+
+  nav.sidebar {
+    width: 220px; flex-shrink: 0;
+    background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 20px 14px; gap: 4px;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .brand { display: flex; align-items: baseline; gap: 8px; padding: 4px 10px 20px; }
+  .brand .mark { width: 10px; height: 10px; border-radius: 2px; background: var(--accent); display: inline-block; transform: rotate(45deg); }
+  .brand .name { font-weight: 600; font-size: 15px; letter-spacing: .01em; }
+  .brand .sub { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .08em; }
+
+  .navitem {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px;
+    color: var(--ink-dim); cursor: pointer; font-size: 13.5px; font-weight: 500;
+    border: none; background: none; text-align: left; width: 100%;
+  }
+  .navitem:hover { background: var(--surface-2); color: var(--ink); }
+  .navitem.active { background: var(--accent-soft); color: var(--accent); }
+  .navitem .ic { width: 16px; text-align: center; opacity: .85; }
+
+  .sidebar-foot { margin-top: auto; padding: 10px; font-size: 11px; color: var(--ink-faint); border-top: 1px solid var(--border); }
+  .sidebar-foot .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--ink-faint); }
+  .sidebar-foot .dot.ok { background: var(--good); }
+  .sidebar-foot .dot.stale { background: var(--warn); }
+
+  main { flex: 1; padding: 32px 40px 60px; max-width: 1180px; }
+
+  .pagehead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .pagehead h1 { font-size: 22px; font-weight: 650; }
+  .pagehead .desc { color: var(--ink-dim); font-size: 13px; margin-top: 4px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 7px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+    font-size: 13px; font-weight: 550; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--ink-faint); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.ghost { border-color: transparent; background: none; }
+  .btn.ghost:hover { background: var(--surface-2); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn.sm { padding: 5px 10px; font-size: 12px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .tile .label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); font-weight: 600; }
+  .tile .value { font-size: 25px; font-weight: 650; margin-top: 6px; font-family: "IBM Plex Mono", monospace; }
+  .tile .sub { font-size: 12px; color: var(--ink-dim); margin-top: 3px; }
+  .tile .value.accent { color: var(--accent); }
+  .tile .value.violet { color: var(--violet); }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 22px; overflow: hidden; }
+  .card .card-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .card .card-head h3 { font-size: 14px; font-weight: 620; }
+  .card .card-head .hint { font-size: 12px; color: var(--ink-faint); }
+  .card .card-body { padding: 18px; }
+
+  .chart-wrap { overflow-x: auto; }
+  svg text { font-family: "IBM Plex Mono", monospace; fill: var(--ink-dim); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-family: "IBM Plex Mono", monospace; text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+  tr.clickable:hover { background: var(--surface-2); cursor: pointer; }
+
+  .empty { text-align: center; padding: 50px 20px; color: var(--ink-faint); }
+  .empty .big { font-size: 30px; margin-bottom: 8px; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--ink-dim); }
+  .field input, .field select, .field textarea {
+    padding: 8px 10px; border-radius: 7px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--ink); font-size: 13.5px; font-family: inherit;
+  }
+  .field textarea { font-family: "IBM Plex Mono", monospace; font-size: 12px; min-height: 140px; resize: vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(10,16,14,.45); display: flex; align-items: flex-start; justify-content: center; padding: 8vh 20px; z-index: 50; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; width: 100%; max-width: 480px; box-shadow: var(--shadow); }
+  .modal .mh { padding: 16px 20px; border-bottom: 1px solid var(--border); font-weight: 640; font-size: 15px; }
+  .modal .mb { padding: 20px; }
+  .modal .mf { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+  [hidden] { display: none !important; }
+
+  .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 9px; font-size: 13px; box-shadow: var(--shadow); z-index: 80; opacity: 0; transition: opacity .2s; }
+  .toast.show { opacity: 1; }
+
+  .badge-count { background: var(--surface-2); color: var(--ink-dim); font-size: 11px; padding: 1px 7px; border-radius: 999px; margin-left: auto; }
+  code.k { background: var(--surface-2); padding: 1px 6px; border-radius: 5px; font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 12px; color: var(--ink-dim); }
+  .legend .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <nav class="sidebar">
+    <div class="brand"><span class="mark"></span><span class="name">Ledger</span></div>
+    <div style="padding:0 10px 14px"><span class="brand sub" style="padding:0">Conso Claude Code</span></div>
+    <button class="navitem active" data-view="dashboard"><span class="ic">◧</span>Tableau de bord</button>
+    <button class="navitem" data-view="clients"><span class="ic">◔</span>Clients</button>
+    <button class="navitem" data-view="projects"><span class="ic">◇</span>Projets</button>
+    <button class="navitem" data-view="import"><span class="ic">⇩</span>Synchro</button>
+    <button class="navitem" data-view="settings"><span class="ic">⚙</span>Tarifs</button>
+    <div class="sidebar-foot" id="sidebar-status">Connexion…</div>
+  </nav>
+  <main id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+const state = {
+  view: "dashboard",
+  clients: [],
+  projects: [],
+  usage: [],
+  pricing: null,
+  lastSync: null,
+  loaded: false,
+};
+
+const DEFAULT_PRICING = {
+  models: {
+    "claude-fable-5":   { in: 10, out: 50, cacheWrite: 12.5, cacheRead: 1 },
+    "claude-mythos-5":  { in: 10, out: 50, cacheWrite: 12.5, cacheRead: 1 },
+    "claude-opus-5":    { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-opus-4-8":  { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-opus-4-7":  { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-opus-4-6":  { in: 5,  out: 25, cacheWrite: 6.25, cacheRead: 0.5 },
+    "claude-sonnet-5":  { in: 2,  out: 10, cacheWrite: 2.5,  cacheRead: 0.2 },
+    "claude-sonnet-4-6":{ in: 3,  out: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+    "claude-haiku-4-5": { in: 1,  out: 5,  cacheWrite: 1.25, cacheRead: 0.1 },
+  },
+  fallback: { in: 3, out: 15, cacheWrite: 3.75, cacheRead: 0.3 },
+  updatedAt: null,
+};
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 2400);
+}
+
+function fmtNum(n) { if (n === undefined || n === null || isNaN(n)) return "–"; return Math.round(n).toLocaleString("fr-FR"); }
+function fmtCompact(n) {
+  if (n === undefined || n === null || isNaN(n)) return "–";
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2).replace(".", ",") + "M";
+  if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1).replace(".", ",") + "k";
+  return Math.round(n).toString();
+}
+function fmtUsd(n) { if (n === undefined || n === null || isNaN(n)) return "–"; return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function escapeHtml(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function modelLabel(model) { return model ? model.replace("claude-", "") : "?"; }
+
+function pricingFor(model) {
+  const p = state.pricing || DEFAULT_PRICING;
+  return p.models[model] || p.fallback || DEFAULT_PRICING.fallback;
+}
+function costOf(model, totals) {
+  const p = pricingFor(model);
+  const t = totals || {};
+  return (t.input || 0) * p.in / 1e6 + (t.output || 0) * p.out / 1e6 +
+         (t.cacheCreate || 0) * p.cacheWrite / 1e6 + (t.cacheRead || 0) * p.cacheRead / 1e6;
+}
+
+/* ---------------- API ---------------- */
+async function api(path, opts) {
+  const res = await fetch(path, { credentials: "same-origin", headers: { "Content-Type": "application/json" }, ...opts });
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = (await res.json()).error || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function loadState() {
+  try {
+    const data = await api("/api/state");
+    state.clients = data.clients || [];
+    state.projects = data.projects || [];
+    state.usage = data.usage || [];
+    state.pricing = data.pricing || DEFAULT_PRICING;
+    state.lastSync = data.lastSync || null;
+    state.loaded = true;
+    updateSidebarStatus();
+    render();
+  } catch (e) {
+    document.getElementById("sidebar-status").innerHTML = `<span class="dot"></span>Erreur de connexion`;
+  }
+}
+
+function updateSidebarStatus() {
+  const el = document.getElementById("sidebar-status");
+  if (!state.lastSync) { el.innerHTML = `<span class="dot"></span>Aucune synchro reçue`; return; }
+  const at = new Date(state.lastSync.at);
+  const hoursAgo = (Date.now() - at.getTime()) / 3600000;
+  const cls = hoursAgo < 8 ? "ok" : "stale";
+  el.innerHTML = `<span class="dot ${cls}"></span>Synchro : ${at.toLocaleString("fr-FR")}`;
+}
+
+/* ---------------- derived data helpers ---------------- */
+function projectForKey(key) { return state.projects.find(p => (p.projectKeys || []).includes(key)); }
+function clientForProject(project) { return project ? state.clients.find(c => c.id === project.clientId || c.id === project.client_id) : null; }
+
+function allDailyRows() {
+  const rows = [];
+  for (const u of state.usage) {
+    const daily = u.daily || {};
+    for (const [date, t] of Object.entries(daily)) rows.push({ date, projectKey: u.projectKey, model: u.model, ...t });
+  }
+  return rows;
+}
+function aggregate(rows, keyFn) {
+  const map = new Map();
+  for (const r of rows) {
+    const k = keyFn(r);
+    if (!map.has(k)) map.set(k, { input: 0, output: 0, cacheCreate: 0, cacheRead: 0, count: 0 });
+    const b = map.get(k);
+    b.input += r.input || 0; b.output += r.output || 0;
+    b.cacheCreate += r.cacheCreate || 0; b.cacheRead += r.cacheRead || 0;
+    b.count++;
+  }
+  return map;
+}
+function totalTokens(t) { return (t.input || 0) + (t.output || 0) + (t.cacheCreate || 0) + (t.cacheRead || 0); }
+
+/* ---------------- rendering ---------------- */
+function render() {
+  const main = document.getElementById("main");
+  document.querySelectorAll(".navitem").forEach(b => b.classList.toggle("active", b.dataset.view === state.view));
+  if (!state.loaded) { main.innerHTML = `<div class="empty">Chargement…</div>`; return; }
+  if (state.view === "dashboard") main.innerHTML = renderDashboard();
+  else if (state.view === "clients") main.innerHTML = renderClients();
+  else if (state.view === "projects") main.innerHTML = renderProjects();
+  else if (state.view === "import") main.innerHTML = renderImport();
+  else if (state.view === "settings") main.innerHTML = renderSettings();
+  wireView();
+}
+
+function renderDashboard() {
+  const rows = allDailyRows();
+  if (rows.length === 0) {
+    return `
+      <div class="pagehead"><div><h1>Tableau de bord</h1><div class="desc">Vue d'ensemble de ta consommation de tokens Claude Code</div></div></div>
+      <div class="card"><div class="empty">
+        <div class="big">◧</div>
+        <div><strong>Aucune donnée pour l'instant.</strong></div>
+        <div style="margin-top:6px">La synchro automatique alimentera cette page dès son premier envoi.</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:16px">
+          <button class="btn primary" id="btn-refresh" ${state.refreshing ? "disabled" : ""}>${state.refreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir maintenant"}</button>
+          <button class="btn" data-nav="import">Voir le statut de synchro</button>
+        </div>
+      </div></div>`;
+  }
+
+  const now = new Date();
+  const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+  const d7 = new Date(now); d7.setDate(d7.getDate() - 7);
+  const in30 = rows.filter(r => r.date >= d30.toISOString().slice(0, 10));
+  const in7 = rows.filter(r => r.date >= d7.toISOString().slice(0, 10));
+
+  const totalAll = rows.reduce((s, r) => s + totalTokens(r), 0);
+  const total30 = in30.reduce((s, r) => s + totalTokens(r), 0);
+  const total7 = in7.reduce((s, r) => s + totalTokens(r), 0);
+  const cost30 = in30.reduce((s, r) => s + costOf(r.model, r), 0);
+  const costAll = rows.reduce((s, r) => s + costOf(r.model, r), 0);
+  const activeProjects = new Set(in30.map(r => r.projectKey)).size;
+
+  const byDate = aggregate(in30, r => r.date);
+  const dates = [];
+  for (let i = 29; i >= 0; i--) { const dt = new Date(now); dt.setDate(dt.getDate() - i); dates.push(dt.toISOString().slice(0, 10)); }
+  const series = dates.map(d => totalTokens(byDate.get(d) || {}));
+
+  const byModel = aggregate(rows, r => r.model);
+  const modelEntries = [...byModel.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1]));
+
+  const byProject = aggregate(in30, r => r.projectKey);
+  const projectEntries = [...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1])).slice(0, 8);
+  const maxProjectVal = Math.max(1, ...projectEntries.map(([, v]) => totalTokens(v)));
+
+  const colors = ["#21705c", "#6a5aa8", "#b9791f", "#bd4636", "#2f8f5b", "#4a7fb5", "#a8635c", "#7d8f52"];
+
+  return `
+    <div class="pagehead">
+      <div><h1>Tableau de bord</h1><div class="desc">Vue d'ensemble de ta consommation de tokens Claude Code</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="btn-refresh" ${state.refreshing ? "disabled" : ""}>${state.refreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir"}</button>
+        <button class="btn ghost" data-nav="import">⇩ Statut de synchro</button>
+      </div>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><div class="label">7 derniers jours</div><div class="value">${fmtCompact(total7)}</div><div class="sub">tokens</div></div>
+      <div class="tile"><div class="label">30 derniers jours</div><div class="value accent">${fmtCompact(total30)}</div><div class="sub">≈ ${fmtUsd(cost30)}</div></div>
+      <div class="tile"><div class="label">Total cumulé</div><div class="value">${fmtCompact(totalAll)}</div><div class="sub">≈ ${fmtUsd(costAll)} au total</div></div>
+      <div class="tile"><div class="label">Projets actifs (30j)</div><div class="value violet">${activeProjects}</div><div class="sub">sur ${state.projects.length || "–"} suivis</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Tokens par jour · 30 derniers jours</h3><span class="hint">total (input + output + cache)</span></div>
+      <div class="card-body chart-wrap">${sparkBarChart(dates, series)}</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:22px;align-items:start">
+      <div class="card">
+        <div class="card-head"><h3>Par projet · 30 derniers jours</h3><span class="hint">tokens totaux</span></div>
+        <div class="card-body">${projectEntries.length ? hBarChart(projectEntries, maxProjectVal, colors) : emptyMini()}</div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Par modèle · cumulé</h3></div>
+        <div class="card-body">${donutChart(modelEntries, colors)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Détail par projet</h3><span class="hint">30 derniers jours, coût estimé</span></div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Projet</th><th>Client</th><th class="num">Input</th><th class="num">Output</th><th class="num">Cache</th><th class="num">Total</th><th class="num">Coût est.</th></tr></thead>
+          <tbody>
+            ${[...byProject.entries()].sort((a, b) => totalTokens(b[1]) - totalTokens(a[1])).map(([pkey, t]) => {
+              const proj = projectForKey(pkey);
+              const client = clientForProject(proj);
+              const cost = in30.filter(r => r.projectKey === pkey).reduce((s, r) => s + costOf(r.model, r), 0);
+              return `<tr>
+                <td>${escapeHtml(proj ? proj.name : pkey)}${!proj ? ` <span class="hint" style="color:var(--warn)">· non lié</span>` : ""}</td>
+                <td>${escapeHtml(client ? client.name : "—")}</td>
+                <td class="num mono">${fmtNum(t.input)}</td>
+                <td class="num mono">${fmtNum(t.output)}</td>
+                <td class="num mono">${fmtNum(t.cacheCreate + t.cacheRead)}</td>
+                <td class="num mono">${fmtNum(totalTokens(t))}</td>
+                <td class="num mono">${fmtUsd(cost)}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function emptyMini() { return `<div class="hint" style="padding:20px 0;text-align:center">Pas de données sur cette période.</div>`; }
+
+function sparkBarChart(dates, values) {
+  const w = 900, h = 160, padL = 40, padB = 22, padT = 10;
+  const max = Math.max(1, ...values);
+  const barW = (w - padL - 10) / dates.length;
+  const bars = values.map((v, i) => {
+    const bh = (h - padT - padB) * (v / max);
+    const x = padL + i * barW, y = h - padB - bh;
+    const isLast = i === values.length - 1;
+    return `<rect x="${x + 1.5}" y="${y}" width="${Math.max(1, barW - 3)}" height="${bh}" rx="2" fill="${isLast ? "var(--accent)" : "var(--accent-soft)"}"></rect>`;
+  }).join("");
+  const gridY = [0, 0.5, 1].map(f => {
+    const y = padT + (h - padT - padB) * (1 - f);
+    return `<line x1="${padL}" x2="${w - 5}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-width="1"></line>
+            <text x="${padL - 8}" y="${y + 3}" font-size="10" text-anchor="end">${fmtCompact(max * f)}</text>`;
+  }).join("");
+  const labelEvery = Math.ceil(dates.length / 8);
+  const labels = dates.map((d, i) => i % labelEvery !== 0 ? "" : `<text x="${padL + i * barW + barW / 2}" y="${h - 5}" font-size="10" text-anchor="middle">${d.slice(5)}</text>`).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" style="max-width:${w}px;display:block" role="img" aria-label="Tokens par jour">${gridY}${bars}${labels}</svg>`;
+}
+
+function hBarChart(entries, max, colors) {
+  return `<div style="display:flex;flex-direction:column;gap:10px">
+    ${entries.map(([pkey, t], i) => {
+      const proj = projectForKey(pkey);
+      const name = proj ? proj.name : pkey;
+      const val = totalTokens(t);
+      const pct = Math.max(2, (val / max) * 100);
+      return `<div>
+        <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px">
+          <span>${escapeHtml(name)}</span><span class="mono" style="color:var(--ink-dim)">${fmtCompact(val)}</span>
+        </div>
+        <div style="height:8px;border-radius:5px;background:var(--surface-2);overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${colors[i % colors.length]};border-radius:5px"></div>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+function donutChart(entries, colors) {
+  if (!entries.length) return emptyMini();
+  const total = entries.reduce((s, [, t]) => s + totalTokens(t), 0) || 1;
+  const r = 52, cx = 70, cy = 70, sw = 22;
+  let acc = 0;
+  const circumference = 2 * Math.PI * r;
+  const arcs = entries.slice(0, 6).map(([model, t], i) => {
+    const frac = totalTokens(t) / total;
+    const dash = frac * circumference;
+    const offset = circumference - acc * circumference;
+    acc += frac;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${colors[i % colors.length]}" stroke-width="${sw}"
+      stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${offset}" transform="rotate(-90 ${cx} ${cy})"></circle>`;
+  }).join("");
+  const legend = entries.slice(0, 6).map(([model, t], i) => {
+    const pct = ((totalTokens(t) / total) * 100).toFixed(1);
+    return `<div><span class="sw" style="background:${colors[i % colors.length]}"></span>${modelLabel(model)} — ${pct}%</div>`;
+  }).join("");
+  return `<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+    <svg width="140" height="140" viewBox="0 0 140 140">${arcs}</svg>
+    <div class="legend" style="flex-direction:column;gap:8px;margin-top:0">${legend}</div>
+  </div>`;
+}
+
+function renderClients() {
+  const rows = state.clients.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  return `
+    <div class="pagehead">
+      <div><h1>Clients</h1><div class="desc">Les organisations ou personnes pour qui tu factures du travail Claude Code</div></div>
+      <button class="btn primary" id="btn-add-client">+ Nouveau client</button>
+    </div>
+    <div class="card">
+      ${rows.length === 0 ? `<div class="empty"><div class="big">◔</div>Aucun client pour l'instant.</div>` : `
+      <table>
+        <thead><tr><th>Nom</th><th>Société</th><th>Email</th><th class="num">Projets</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map(c => {
+            const nProj = state.projects.filter(p => p.clientId === c.id).length;
+            return `<tr class="clickable" data-edit-client="${c.id}">
+              <td><strong>${escapeHtml(c.name)}</strong></td>
+              <td>${escapeHtml(c.company || "—")}</td>
+              <td>${escapeHtml(c.email || "—")}</td>
+              <td class="num mono">${nProj}</td>
+              <td style="text-align:right"><button class="btn ghost sm" data-del-client="${c.id}">Supprimer</button></td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`}
+    </div>
+  `;
+}
+
+function renderProjects() {
+  const rows = state.projects.slice().sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const unmatchedKeys = [...new Set(state.usage.map(u => u.projectKey))].filter(k => !projectForKey(k));
+  return `
+    <div class="pagehead">
+      <div><h1>Projets</h1><div class="desc">Relie tes dossiers de travail locaux à un client pour ventiler la conso</div></div>
+      <button class="btn primary" id="btn-add-project">+ Nouveau projet</button>
+    </div>
+
+    ${unmatchedKeys.length ? `
+    <div class="card">
+      <div class="card-head"><h3>Dossiers importés non liés</h3><span class="badge-count">${unmatchedKeys.length}</span></div>
+      <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          ${unmatchedKeys.map(k => `<span class="btn sm" data-quick-link="${escapeHtml(k)}" style="cursor:pointer">${escapeHtml(k)} +</span>`).join("")}
+        </div>
+      </div>
+    </div>` : ""}
+
+    <div class="card">
+      ${rows.length === 0 ? `<div class="empty"><div class="big">◇</div>Aucun projet pour l'instant.</div>` : `
+      <table>
+        <thead><tr><th>Projet</th><th>Client</th><th>Clés liées (dossiers)</th><th class="num">Taux $/h</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map(p => {
+            const client = state.clients.find(c => c.id === p.clientId);
+            return `<tr class="clickable" data-edit-project="${p.id}">
+              <td><strong>${escapeHtml(p.name)}</strong></td>
+              <td>${escapeHtml(client ? client.name : "—")}</td>
+              <td>${(p.projectKeys || []).map(k => `<code class="k">${escapeHtml(k)}</code>`).join(" ") || "—"}</td>
+              <td class="num mono">${p.rate ? p.rate : "—"}</td>
+              <td style="text-align:right"><button class="btn ghost sm" data-del-project="${p.id}">Supprimer</button></td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`}
+    </div>
+  `;
+}
+
+function renderImport() {
+  const sync = state.lastSync;
+  const statusCard = sync ? `
+    <div class="card">
+      <div class="card-head"><h3>Dernière synchro reçue</h3></div>
+      <div class="card-body">
+        <div style="display:flex;gap:26px;flex-wrap:wrap">
+          <div><div class="hint" style="color:var(--ink-faint)">Reçue le</div><div class="mono" style="font-size:15px">${new Date(sync.at).toLocaleString("fr-FR")}</div></div>
+          <div><div class="hint" style="color:var(--ink-faint)">Enregistrements</div><div class="mono" style="font-size:15px">${sync.written}</div></div>
+          <div><div class="hint" style="color:var(--ink-faint)">Messages sources</div><div class="mono" style="font-size:15px">${sync.messageCount ?? "—"}</div></div>
+        </div>
+      </div>
+    </div>` : `
+    <div class="card"><div class="empty"><div class="big">⇩</div>Aucune synchro reçue pour l'instant.</div></div>`;
+
+  return `
+    <div class="pagehead"><div><h1>Synchro</h1><div class="desc">Le serveur reçoit automatiquement les tokens depuis ta machine locale</div></div></div>
+
+    ${statusCard}
+
+    <div class="card">
+      <div class="card-head"><h3>Comment ça marche</h3></div>
+      <div class="card-body">
+        <p style="margin:0 0 10px;color:var(--ink-dim)">Sur ta machine, un job planifié exécute <code class="k">sync_usage.sh</code> toutes les 4h. Il lit tes logs Claude Code locaux et pousse directement le résultat ici :</p>
+        <pre class="mono" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px;overflow-x:auto">python3 export_usage.py --days 90 | curl -sS -X POST "$LEDGER_URL/api/sync" \\
+  -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d @-</pre>
+        <p style="margin:10px 0 0;color:var(--ink-dim);font-size:12.5px">Rien à faire de ton côté une fois installé — cette page se met à jour toute seule.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>Import manuel</h3><span class="hint">secours, si la synchro auto est indisponible</span></div>
+      <div class="card-body">
+        <div class="field"><textarea id="import-json" placeholder='{"exportedAt":"...","projects":[...]}'></textarea></div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn" id="btn-import-manual">Importer ce texte</button>
+          <span class="hint" id="import-status" style="color:var(--ink-faint);font-size:12.5px"></span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSettings() {
+  const pricing = state.pricing || DEFAULT_PRICING;
+  const models = Object.keys(pricing.models);
+  return `
+    <div class="pagehead"><div><h1>Tarifs</h1><div class="desc">Prix par million de tokens, utilisés pour estimer le coût</div></div></div>
+    <div class="card">
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Modèle</th><th class="num">Input $/M</th><th class="num">Output $/M</th><th class="num">Cache write $/M</th><th class="num">Cache read $/M</th></tr></thead>
+          <tbody>
+            ${models.map(m => {
+              const p = pricing.models[m];
+              const inp = (field, val) => `<input class="mono" data-price="${m}" data-field="${field}" type="number" step="0.01" value="${val}" style="width:70px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)">`;
+              return `<tr>
+                <td>${escapeHtml(modelLabel(m))}</td>
+                <td class="num">${inp("in", p.in)}</td>
+                <td class="num">${inp("out", p.out)}</td>
+                <td class="num">${inp("cacheWrite", p.cacheWrite)}</td>
+                <td class="num">${inp("cacheRead", p.cacheRead)}</td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+      <div class="mf" style="display:flex;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--border)">
+        <button class="btn primary" id="btn-save-pricing">Enregistrer</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------- modals ---------------- */
+function openModal(html) {
+  const wrap = document.createElement("div");
+  wrap.className = "modal-backdrop";
+  wrap.id = "modal-backdrop";
+  wrap.innerHTML = `<div class="modal">${html}</div>`;
+  wrap.addEventListener("click", e => { if (e.target === wrap) closeModal(); });
+  document.body.appendChild(wrap);
+}
+function closeModal() { const el = document.getElementById("modal-backdrop"); if (el) el.remove(); }
+
+function clientModal(existing) {
+  const c = existing || {};
+  openModal(`
+    <div class="mh">${existing ? "Modifier le client" : "Nouveau client"}</div>
+    <div class="mb">
+      <div class="field"><label>Nom</label><input id="m-name" value="${escapeHtml(c.name || "")}" placeholder="Ada Lovelace"></div>
+      <div class="row2">
+        <div class="field"><label>Société</label><input id="m-company" value="${escapeHtml(c.company || "")}" placeholder="Analytical Engines Inc."></div>
+        <div class="field"><label>Email</label><input id="m-email" value="${escapeHtml(c.email || "")}" placeholder="ada@example.com"></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="m-notes" style="min-height:80px">${escapeHtml(c.notes || "")}</textarea></div>
+    </div>
+    <div class="mf"><button class="btn ghost" id="m-cancel">Annuler</button><button class="btn primary" id="m-save">Enregistrer</button></div>
+  `);
+  document.getElementById("m-cancel").onclick = closeModal;
+  document.getElementById("m-save").onclick = async () => {
+    const name = document.getElementById("m-name").value.trim();
+    if (!name) { toast("Le nom est requis"); return; }
+    const data = {
+      name,
+      company: document.getElementById("m-company").value.trim(),
+      email: document.getElementById("m-email").value.trim(),
+      notes: document.getElementById("m-notes").value.trim(),
+    };
+    try {
+      if (existing) await api("/api/clients/" + existing.id, { method: "PUT", body: JSON.stringify(data) });
+      else await api("/api/clients", { method: "POST", body: JSON.stringify(data) });
+      closeModal();
+      toast("Client enregistré");
+      await loadState();
+    } catch (e) { toast("Erreur : " + e.message); }
+  };
+}
+
+function projectModal(existing, presetKey) {
+  const p = existing || {};
+  const clientOptions = state.clients.map(c => `<option value="${c.id}" ${p.clientId === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
+  openModal(`
+    <div class="mh">${existing ? "Modifier le projet" : "Nouveau projet"}</div>
+    <div class="mb">
+      <div class="field"><label>Nom du projet</label><input id="m-name" value="${escapeHtml(p.name || presetKey || "")}" placeholder="Refonte du site vitrine"></div>
+      <div class="field"><label>Client</label><select id="m-client"><option value="">— aucun —</option>${clientOptions}</select></div>
+      <div class="field"><label>Clés de dossier liées (une par ligne — nom du dossier local)</label><textarea id="m-keys" style="min-height:70px;font-family:'IBM Plex Mono',monospace">${escapeHtml((p.projectKeys || (presetKey ? [presetKey] : [])).join("\n"))}</textarea></div>
+      <div class="field"><label>Taux horaire facturé ($/h, optionnel)</label><input id="m-rate" type="number" step="1" value="${p.rate || ""}" placeholder="150"></div>
+    </div>
+    <div class="mf"><button class="btn ghost" id="m-cancel">Annuler</button><button class="btn primary" id="m-save">Enregistrer</button></div>
+  `);
+  document.getElementById("m-cancel").onclick = closeModal;
+  document.getElementById("m-save").onclick = async () => {
+    const name = document.getElementById("m-name").value.trim();
+    if (!name) { toast("Le nom est requis"); return; }
+    const keys = document.getElementById("m-keys").value.split("\n").map(s => s.trim()).filter(Boolean);
+    const data = {
+      name,
+      clientId: document.getElementById("m-client").value || null,
+      projectKeys: keys,
+      rate: parseFloat(document.getElementById("m-rate").value) || null,
+    };
+    try {
+      if (existing) await api("/api/projects/" + existing.id, { method: "PUT", body: JSON.stringify(data) });
+      else await api("/api/projects", { method: "POST", body: JSON.stringify(data) });
+      closeModal();
+      toast("Projet enregistré");
+      await loadState();
+    } catch (e) { toast("Erreur : " + e.message); }
+  };
+}
+
+/* ---------------- on-demand refresh ---------------- */
+async function handleRefreshClick() {
+  const previousSyncAt = state.lastSync ? state.lastSync.at : null;
+  state.refreshing = true;
+  render();
+  try {
+    await api("/api/request-sync", { method: "POST" });
+    toast("Synchro demandée — la machine locale la traitera sous ~1 min");
+  } catch (e) {
+    toast("Erreur : " + e.message);
+    state.refreshing = false;
+    render();
+    return;
+  }
+
+  const deadline = Date.now() + 3 * 60 * 1000; // 3 min max
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 5000));
+/* ---------------- manual import fallback ---------------- */
+async function handleImportManual() {
+  const raw = document.getElementById("import-json").value.trim();
+  const statusEl = document.getElementById("import-status");
+  if (!raw) { statusEl.textContent = "Colle d'abord le JSON exporté."; return; }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch (e) { statusEl.textContent = "JSON invalide : " + e.message; return; }
+  try {
+    statusEl.textContent = "Import en cours…";
+    const result = await api("/api/import", { method: "POST", body: JSON.stringify(parsed) });
+    statusEl.textContent = `Importé : ${result.written} enregistrement(s).`;
+    toast("Import terminé");
+    document.getElementById("import-json").value = "";
+    await loadState();
+  } catch (e) {
+    statusEl.textContent = "Erreur : " + e.message;
+  }
+}
+
+/* ---------------- wiring ---------------- */
+function wireView() {
+  document.querySelectorAll("[data-nav]").forEach(el => { el.onclick = () => { state.view = el.dataset.nav; render(); }; });
+
+  const addClientBtn = document.getElementById("btn-add-client");
+  if (addClientBtn) addClientBtn.onclick = () => clientModal(null);
+  document.querySelectorAll("[data-edit-client]").forEach(el => { el.onclick = () => clientModal(state.clients.find(c => c.id === el.dataset.editClient)); });
+  document.querySelectorAll("[data-del-client]").forEach(el => {
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      try { await api("/api/clients/" + el.dataset.delClient, { method: "DELETE" }); toast("Client supprimé"); await loadState(); }
+      catch (err) { toast("Erreur : " + err.message); }
+    };
+  });
+
+  const addProjectBtn = document.getElementById("btn-add-project");
+  if (addProjectBtn) addProjectBtn.onclick = () => projectModal(null);
+  document.querySelectorAll("[data-edit-project]").forEach(el => { el.onclick = () => projectModal(state.projects.find(p => p.id === el.dataset.editProject)); });
+  document.querySelectorAll("[data-del-project]").forEach(el => {
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      try { await api("/api/projects/" + el.dataset.delProject, { method: "DELETE" }); toast("Projet supprimé"); await loadState(); }
+      catch (err) { toast("Erreur : " + err.message); }
+    };
+  });
+  document.querySelectorAll("[data-quick-link]").forEach(el => { el.onclick = () => projectModal(null, el.dataset.quickLink); });
+
+  const importManualBtn = document.getElementById("btn-import-manual");
+  if (importManualBtn) importManualBtn.onclick = handleImportManual;
+
+  const savePricingBtn = document.getElementById("btn-save-pricing");
+  if (savePricingBtn) savePricingBtn.onclick = async () => {
+    const pricing = JSON.parse(JSON.stringify(state.pricing || DEFAULT_PRICING));
+    document.querySelectorAll("[data-price]").forEach(input => {
+      const model = input.dataset.price, field = input.dataset.field;
+      if (!pricing.models[model]) pricing.models[model] = {};
+      pricing.models[model][field] = parseFloat(input.value) || 0;
+    });
+    try { await api("/api/pricing", { method: "PUT", body: JSON.stringify(pricing) }); toast("Tarifs enregistrés"); await loadState(); }
+    catch (e) { toast("Erreur : " + e.message); }
+  };
+}
+
+document.querySelectorAll("nav .navitem").forEach(btn => btn.addEventListener("click", () => { state.view = btn.dataset.view; render(); }));
+
+render();
+loadState();
+setInterval(loadState, 60000);
+</script>
+</body>
+</html>
