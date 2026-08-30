@@ -879,6 +879,7 @@ function renderDeviceDetail() {
   const st = deviceStatus(device);
   const dotColor = st.historic ? "var(--ink-faint)" : st.seen ? "var(--good)" : "var(--warn)";
   const lastImported = state.usage.filter(u => u.deviceId === device.id).reduce((max, u) => !max || u.importedAt > max ? u.importedAt : max, null);
+  const deviceClient = state.clients.find(c => c.id === device.clientId);
 
   const header = `
     <div class="pagehead">
@@ -890,7 +891,7 @@ function renderDeviceDetail() {
       <div style="display:flex;gap:8px">
         ${device.id !== "legacy" ? `<button class="btn" id="btn-refresh-device" data-refresh-device="${device.id}" ${state.deviceRefreshing ? "disabled" : ""}>${state.deviceRefreshing ? "⏳ Synchro en cours…" : "↻ Rafraîchir"}</button>` : ""}
         ${device.id !== "legacy" ? `<button class="btn" data-share-device="${device.id}">↗ Lien de partage</button>` : ""}
-        ${device.id !== "legacy" ? `<button class="btn" data-rename-device="${device.id}">Renommer</button>` : ""}
+        ${device.id !== "legacy" ? `<button class="btn" data-rename-device="${device.id}">Modifier</button>` : ""}
       </div>
     </div>
     <div class="card">
@@ -900,6 +901,7 @@ function renderDeviceDetail() {
           <strong>${st.label}</strong>
         </div>
         ${device.hostname && device.hostname !== device.name ? `<div><div class="hint" style="color:var(--ink-faint)">Machine</div><div style="font-size:13px">${escapeHtml(device.hostname)}</div></div>` : ""}
+        <div><div class="hint" style="color:var(--ink-faint)">Client</div><div style="font-size:13px">${escapeHtml(deviceClient ? deviceClient.name : "—")}</div></div>
         ${device.firstSeen ? `<div><div class="hint" style="color:var(--ink-faint)">Premier contact</div><div class="mono" style="font-size:13px">${new Date(device.firstSeen).toLocaleDateString("fr-FR")}</div></div>` : ""}
         ${device.lastSeen ? `<div><div class="hint" style="color:var(--ink-faint)">Dernier contact</div><div class="mono" style="font-size:13px">${timeAgo(device.lastSeen)}</div></div>` : ""}
         <div><div class="hint" style="color:var(--ink-faint)">Dernière donnée reçue</div><div class="mono" style="font-size:13px">${lastImported ? timeAgo(lastImported) : "—"}</div></div>
@@ -1310,7 +1312,8 @@ function invoiceModal() {
   }
 
   function onClientChange() {
-    extraDeviceIds = [];
+    const { clientId } = currentLines();
+    extraDeviceIds = state.devices.filter(d => d.clientId === clientId).map(d => d.id);
     customLines = [];
     renderProjectLines();
     renderDeviceSection();
@@ -1458,22 +1461,24 @@ function renderDevices() {
     <div class="card">
       ${perDevice.length === 0 ? `<div class="empty"><div class="big">▧</div>Aucun appareil enregistré pour l'instant.</div>` : `
       <table>
-        <thead><tr><th>Appareil</th><th>Statut</th><th>Dernier contact</th><th class="num">Tokens (total)</th><th class="num">Coût est.</th><th></th></tr></thead>
+        <thead><tr><th>Appareil</th><th>Client</th><th>Statut</th><th>Dernier contact</th><th class="num">Tokens (total)</th><th class="num">Coût est.</th><th></th></tr></thead>
         <tbody>
           ${perDevice.map(d => {
             const st = deviceStatus(d);
             const dotColor = st.historic ? "var(--ink-faint)" : st.seen ? "var(--good)" : "var(--warn)";
+            const client = state.clients.find(c => c.id === d.clientId);
             return `<tr class="clickable" data-view-device="${d.id}">
               <td>
                 <strong>${escapeHtml(d.name)}</strong>
                 ${d.hostname && d.hostname !== d.name ? `<div class="hint" style="color:var(--ink-faint)">${escapeHtml(d.hostname)}</div>` : ""}
               </td>
+              <td>${escapeHtml(client ? client.name : "—")}</td>
               <td><span class="dot" style="width:8px;height:8px;border-radius:50%;display:inline-block;background:${dotColor};margin-right:6px"></span>${st.label}</td>
               <td class="hint" style="color:var(--ink-dim)">${d.lastSeen ? timeAgo(d.lastSeen) : "—"}</td>
               <td class="num mono">${fmtCompact(d.tokens)}</td>
               <td class="num mono">${fmtUsd(d.cost)}</td>
               <td style="text-align:right;white-space:nowrap">
-                ${d.id !== "legacy" ? `<button class="btn ghost sm" data-share-device="${d.id}">↗ Partager</button> <button class="btn ghost sm" data-rename-device="${d.id}">Renommer</button> <button class="btn ghost sm" data-del-device="${d.id}">Supprimer</button>` : ""}
+                ${d.id !== "legacy" ? `<button class="btn ghost sm" data-share-device="${d.id}">↗ Partager</button> <button class="btn ghost sm" data-rename-device="${d.id}">Modifier</button> <button class="btn ghost sm" data-del-device="${d.id}">Supprimer</button>` : ""}
               </td>
             </tr>`;
           }).join("")}
@@ -1484,6 +1489,7 @@ function renderDevices() {
 }
 
 function deviceModal(device) {
+  const clientOptions = state.clients.map(c => `<option value="${c.id}" ${device.clientId === c.id ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("");
   openModal(`
     <div class="mh">Renommer l'appareil</div>
     <div class="mb">
