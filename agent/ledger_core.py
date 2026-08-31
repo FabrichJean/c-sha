@@ -86,9 +86,45 @@ def http_call(method: str, url: str, api_key: str, body: dict | None = None, tim
         return resp.status, (json.loads(raw) if raw else {})
 
 
+def _detect_wsl_windows_claude_dir() -> Path | None:
+    """Sous WSL, ~/.claude cote Linux n'est jamais le bon dossier : Claude Code
+    tourne nativement sous Windows et ecrit ses logs dans le HOME Windows, que
+    WSL expose sous /mnt/c/Users/<utilisateur>/.claude/projects. On ne le
+    detecte automatiquement que s'il n'y a qu'un seul candidat — sinon
+    (plusieurs profils Windows) mieux vaut laisser l'utilisateur preciser via
+    LEDGER_CLAUDE_DIR ou "claudeDir" dans sync_config.json plutot que deviner."""
+    try:
+        if "microsoft" not in Path("/proc/version").read_text().lower():
+            return None
+    except OSError:
+        return None
+    mnt_c_users = Path("/mnt/c/Users")
+    if not mnt_c_users.is_dir():
+        return None
+    candidates = [p / ".claude" / "projects" for p in mnt_c_users.iterdir() if (p / ".claude" / "projects").is_dir()]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def resolve_claude_dir() -> Path:
+    env_override = os.environ.get("LEDGER_CLAUDE_DIR")
+    if env_override:
+        return Path(env_override)
+    config = load_json(CONFIG_FILE) or {}
+    if config.get("claudeDir"):
+        return Path(config["claudeDir"])
+    default = Path.home() / ".claude" / "projects"
+    if default.exists():
+        return default
+    detected = _detect_wsl_windows_claude_dir()
+    if detected:
+        log(f"WSL detecte : utilisation de {detected} (au lieu de {default}, cote Linux, qui n'existe pas)")
+        return detected
+    return default
+
+
 def run_export(device: dict) -> dict | None:
     try:
-        result, _count = generate_export(days=90, device_id=device["id"], device_name=device["name"])
+        result, _count = generate_export(days=90, device_id=device["id"], device_name=device["name"], root=resolve_claude_dir())
         return result
     except FileNotFoundError as e:
         log(f"echec export : {e}")

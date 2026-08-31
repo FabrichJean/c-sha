@@ -89,6 +89,23 @@ OS). Pour désinstaller : `python3 uninstall_autosync.py`.
 Pour une synchro ponctuelle manuelle (sans passer par le daemon) :
 `python3 sync_usage.py`.
 
+### WSL (Windows Subsystem for Linux)
+
+Installer l'agent *dans* WSL suit le chemin Linux (`systemd --user`), mais
+attention : `~/.claude/projects` côté WSL est un dossier Linux distinct de
+celui où Claude Code (qui tourne nativement sous Windows) écrit vraiment ses
+logs. L'agent détecte automatiquement le bon dossier côté Windows
+(`/mnt/c/Users/<toi>/.claude/projects`) **si un seul profil Windows en a
+un** — sinon (plusieurs comptes sur la même machine), précise-le explicitement
+via une variable d'environnement ou dans `~/.ledger/sync_config.json` :
+
+```bash
+LEDGER_CLAUDE_DIR=/mnt/c/Users/tonnom/.claude/projects python3 sync_usage.py
+```
+
+ou en ajoutant `"claudeDir": "/mnt/c/Users/tonnom/.claude/projects"` dans
+`sync_config.json`.
+
 ### Sans Python installé
 
 Une seule commande télécharge le binaire de la dernière Release GitHub
