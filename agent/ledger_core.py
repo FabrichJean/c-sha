@@ -347,6 +347,67 @@ WantedBy=default.target
     print("Verifie avec : crontab -l")
 
 
+def _windows_task_xml(command: str, arguments: str) -> str:
+    """Definition XML complete (au lieu de 'schtasks /Create /TR' basique) —
+    necessaire pour desactiver 3 comportements par defaut du Planificateur de
+    taches Windows qui tuent silencieusement un daemon cense tourner en
+    continu, en particulier sur un portable :
+      - ExecutionTimeLimit : 72h par defaut, la tache est tuee au-dela ; on
+        passe a PT0S (illimite).
+      - StopIfGoingOnBatteries : vrai par defaut, arrete la tache des que le
+        portable debranche le secteur.
+      - RestartOnFailure : absent par defaut ; on redemarre automatiquement
+        (equivalent du KeepAlive de launchd / Restart=always de systemd)."""
+    from xml.sax.saxutils import escape
+    return f"""<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Ledger — agent de synchro des tokens (processus persistant)</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+    <RestartOnFailure>
+      <Interval>PT1M</Interval>
+      <Count>999</Count>
+    </RestartOnFailure>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>{escape(command)}</Command>
+      <Arguments>{escape(arguments)}</Arguments>
+    </Exec>
+  </Actions>
+</Task>
+"""
+
+
 def install_windows() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     if is_frozen():
@@ -354,24 +415,27 @@ def install_windows() -> None:
     else:
         python_exe = shutil.which("pythonw") or sys.executable
         program_args = [python_exe, str(_agent_files_dir() / "ledger_agent.py"), "daemon"]
-    tr = " ".join(f'"{p}"' for p in program_args)
+
+    command = program_args[0]
+    arguments = " ".join(f'"{a}"' if " " in a else a for a in program_args[1:])
+    xml_path = LEDGER_DIR / "task.xml"
+    xml_path.parent.mkdir(parents=True, exist_ok=True)
+    xml_path.write_text(_windows_task_xml(command, arguments), encoding="utf-16")
+
     subprocess.run(["schtasks", "/End", "/TN", WINDOWS_TASK_NAME], capture_output=True)
     subprocess.run(["schtasks", "/Delete", "/TN", WINDOWS_TASK_NAME, "/F"], capture_output=True)
-    cmd = [
-        "schtasks", "/Create",
-        "/SC", "ONLOGON",
-        "/TN", WINDOWS_TASK_NAME,
-        "/TR", tr,
-        "/RL", "LIMITED",
-        "/F",
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(
+        ["schtasks", "/Create", "/TN", WINDOWS_TASK_NAME, "/XML", str(xml_path), "/F"],
+        capture_output=True, text=True,
+    )
+    xml_path.unlink(missing_ok=True)
     if result.returncode != 0:
         print(f"Echec de l'installation (schtasks) : {result.stderr.strip()}", file=sys.stderr)
         sys.exit(1)
     # demarre tout de suite, sans attendre la prochaine ouverture de session
     subprocess.run(["schtasks", "/Run", "/TN", WINDOWS_TASK_NAME], capture_output=True)
     print(f"Synchro automatique installee (Windows, tache planifiee, processus persistant : {WINDOWS_TASK_NAME}).")
+    print("Illimitee en duree, resiste au passage sur batterie, redemarre seule si le processus s'arrete.")
     print("Verifie avec : schtasks /Query /TN " + WINDOWS_TASK_NAME)
 
 

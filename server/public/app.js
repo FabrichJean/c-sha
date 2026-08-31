@@ -1968,11 +1968,21 @@ async function handleDeviceRefreshClick(deviceId) {
   // reussie, meme sans nouvel enregistrement ecrit) plutot que via importedAt,
   // qui ne bouge jamais si l'appareil n'a rien de nouveau a envoyer — ce qui
   // faisait tourner l'attente jusqu'au timeout de 3 min meme apres un succes.
-  const requestedAt = new Date().toISOString();
+  // La comparaison se fait entre deux valeurs venant TOUTES LES DEUX du serveur
+  // (jamais Date.now()/toISOString() du navigateur) : un decalage d'horloge
+  // client/serveur (VPS distant, ex. Windows vs Linux) rendrait sinon toute
+  // comparaison ">=" avec l'heure locale du navigateur fausse en permanence.
   state.deviceRefreshing = true;
   state.deviceRefreshStartedAt = Date.now();
   state.deviceRefreshAttempts = 0;
   render();
+
+  let baseline = state.lastSync ? JSON.stringify(state.lastSync) : null;
+  try {
+    const initial = await api("/api/state");
+    baseline = initial.lastSync ? JSON.stringify(initial.lastSync) : null;
+  } catch (e) { /* on garde le baseline deja en memoire */ }
+
   try {
     await api("/api/devices/" + deviceId + "/request-sync", { method: "POST" });
   } catch (e) {
@@ -1990,7 +2000,8 @@ async function handleDeviceRefreshClick(deviceId) {
       const data = await api("/api/state");
       state.devices = data.devices || [];
       const sync = data.lastSync;
-      if (sync && sync.deviceId === deviceId && sync.at >= requestedAt) {
+      const snapshot = sync ? JSON.stringify(sync) : null;
+      if (sync && sync.deviceId === deviceId && snapshot !== baseline) {
         state.clients = data.clients || [];
         state.projects = data.projects || [];
         state.usage = data.usage || [];
