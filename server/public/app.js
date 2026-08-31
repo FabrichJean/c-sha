@@ -1941,9 +1941,6 @@ async function handleRefreshClick() {
 }
 
 /* ---------------- on-demand refresh scope a un seul appareil ---------------- */
-function deviceLastImported(deviceId) {
-  return state.usage.filter(u => u.deviceId === deviceId).reduce((max, u) => !max || u.importedAt > max ? u.importedAt : max, null);
-}
 
 function deviceRefreshProgressBanner(device) {
   if (!state.deviceRefreshing) return "";
@@ -1967,7 +1964,11 @@ function deviceRefreshProgressBanner(device) {
 }
 
 async function handleDeviceRefreshClick(deviceId) {
-  const previousImportedAt = deviceLastImported(deviceId);
+  // on detecte la fin de la synchro via lastSync (mis a jour a CHAQUE synchro
+  // reussie, meme sans nouvel enregistrement ecrit) plutot que via importedAt,
+  // qui ne bouge jamais si l'appareil n'a rien de nouveau a envoyer — ce qui
+  // faisait tourner l'attente jusqu'au timeout de 3 min meme apres un succes.
+  const requestedAt = new Date().toISOString();
   state.deviceRefreshing = true;
   state.deviceRefreshStartedAt = Date.now();
   state.deviceRefreshAttempts = 0;
@@ -1988,8 +1989,8 @@ async function handleDeviceRefreshClick(deviceId) {
     try {
       const data = await api("/api/state");
       state.devices = data.devices || [];
-      const newImportedAt = (data.usage || []).filter(u => u.deviceId === deviceId).reduce((max, u) => !max || u.importedAt > max ? u.importedAt : max, null);
-      if (newImportedAt && newImportedAt !== previousImportedAt) {
+      const sync = data.lastSync;
+      if (sync && sync.deviceId === deviceId && sync.at >= requestedAt) {
         state.clients = data.clients || [];
         state.projects = data.projects || [];
         state.usage = data.usage || [];
