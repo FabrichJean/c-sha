@@ -866,6 +866,15 @@ function deviceBillingSummary(deviceId) {
   return { totalPaid, entries };
 }
 
+/* montant restant a payer pour un appareil (cout total tous temps - deja paye) —
+   c'est ce plafond, pas le cout total, qui doit borner une nouvelle ligne de
+   facture : on ne veut pas re-facturer une part deja reglee. */
+function deviceRemainingAmount(deviceId) {
+  const totalCost = computeTokenCostForDevice(deviceId, null, null).cost;
+  const totalPaid = deviceBillingSummary(deviceId).totalPaid;
+  return Math.max(0, totalCost - totalPaid);
+}
+
 function buildDeviceBillingCard(deviceId) {
   const b = deviceBillingSummary(deviceId);
   if (b.entries.length === 0) return "";
@@ -1020,14 +1029,15 @@ function invoiceModal() {
     const rowsHtml = deviceLines.map(dl => {
       const device = state.devices.find(d => d.id === dl.id);
       if (!device) return "";
-      const { tokens, cost } = computeTokenCostForDevice(dl.id, start, end);
+      const { tokens } = computeTokenCostForDevice(dl.id, start, end);
+      const remaining = deviceRemainingAmount(dl.id);
       return `<tr>
         <td>${escapeHtml(device.name)}</td>
         <td class="hint">Appareil</td>
         <td class="num mono">${fmtCompact(tokens)} tok</td>
         <td>
-          <input type="number" step="0.01" min="0" max="${cost}" value="${dl.amount}" data-device-amount="${dl.id}" style="width:90px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)">
-          <div class="hint" style="color:var(--ink-faint);font-size:10.5px;margin-top:2px;text-align:right">sur ${fmtUsd(cost)}</div>
+          <input type="number" step="0.01" min="0" max="${remaining}" value="${dl.amount}" data-device-amount="${dl.id}" style="width:90px;text-align:right;border:1px solid var(--border);border-radius:5px;padding:4px 6px;background:var(--bg);color:var(--ink)">
+          <div class="hint" style="color:var(--ink-faint);font-size:10.5px;margin-top:2px;text-align:right">sur ${fmtUsd(remaining)} restant</div>
         </td>
         <td style="text-align:right"><button class="btn ghost sm" data-remove-device-line="${dl.id}">✕</button></td>
       </tr>`;
@@ -1035,7 +1045,7 @@ function invoiceModal() {
     devicesEl.innerHTML = `
       <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
         <label style="font-size:12px;font-weight:600;color:var(--ink-dim)">Appareils facturés (conso totale, hors projets)</label>
-        <div class="hint" style="color:var(--ink-faint);font-size:11.5px;margin:2px 0 8px">Le montant est pré-rempli avec le coût total de l'appareil — réduis-le pour n'en facturer qu'une partie.</div>
+        <div class="hint" style="color:var(--ink-faint);font-size:11.5px;margin:2px 0 8px">Le montant est pré-rempli avec le montant restant à payer sur cet appareil (coût total moins ce qui a déjà été payé) — réduis-le pour n'en facturer qu'une partie.</div>
         ${deviceLines.length ? `<table style="margin-top:8px"><thead><tr><th>Appareil</th><th>Mode</th><th class="num">Tokens</th><th class="num">Montant</th><th></th></tr></thead><tbody>${rowsHtml}</tbody></table>` : `<div class="hint" style="color:var(--ink-faint);padding:8px 0;font-size:12.5px">Aucun appareil ajouté.</div>`}
         ${available.length ? `
         <div style="display:flex;gap:8px;margin-top:8px">
@@ -1049,7 +1059,7 @@ function invoiceModal() {
       input.oninput = () => {
         const dl = deviceLines.find(x => x.id === input.dataset.deviceAmount);
         if (!dl) return;
-        const cap = computeTokenCostForDevice(dl.id, start, end).cost;
+        const cap = deviceRemainingAmount(dl.id);
         let amount = parseFloat(input.value) || 0;
         if (amount > cap) { amount = cap; input.value = cap.toFixed(2); }
         dl.amount = amount;
@@ -1063,8 +1073,7 @@ function invoiceModal() {
     if (addBtn) addBtn.onclick = () => {
       const sel = document.getElementById("m-inv-device-select");
       if (sel.value) {
-        const cost = computeTokenCostForDevice(sel.value, start, end).cost;
-        deviceLines.push({ id: sel.value, amount: cost });
+        deviceLines.push({ id: sel.value, amount: deviceRemainingAmount(sel.value) });
       }
       renderDeviceSection();
       updateTotal();
@@ -1178,8 +1187,7 @@ function invoiceModal() {
 
   function onClientChange() {
     const { clientId } = currentLines();
-    const { start, end } = currentPeriod();
-    deviceLines = state.devices.filter(d => d.clientId === clientId).map(d => ({ id: d.id, amount: computeTokenCostForDevice(d.id, start, end).cost }));
+    deviceLines = state.devices.filter(d => d.clientId === clientId).map(d => ({ id: d.id, amount: deviceRemainingAmount(d.id) }));
     customLines = [];
     const client = state.clients.find(c => c.id === clientId);
     const clientPromo = client && client.promoCodeId ? allPromoCodes().find(pc => pc.id === client.promoCodeId) : null;
@@ -1191,9 +1199,8 @@ function invoiceModal() {
     updateTotal();
   }
   function onMonthChange() {
-    const { start, end } = currentPeriod();
     deviceLines.forEach(dl => {
-      const cap = computeTokenCostForDevice(dl.id, start, end).cost;
+      const cap = deviceRemainingAmount(dl.id);
       if (dl.amount > cap) dl.amount = cap;
     });
     renderProjectLines();
@@ -1220,8 +1227,8 @@ function invoiceModal() {
     });
     const deviceLineItems = deviceLines.map(dl => {
       const device = state.devices.find(d => d.id === dl.id);
-      const { tokens, cost } = computeTokenCostForDevice(dl.id, start, end);
-      const partial = dl.amount < cost - 0.005;
+      const { tokens } = computeTokenCostForDevice(dl.id, start, end);
+      const partial = dl.amount < deviceRemainingAmount(dl.id) - 0.005;
       return { deviceId: dl.id, projectName: device ? device.name : dl.id, billingMode: "device", tokens, amount: dl.amount, partial };
     });
     const manualLines = customLines.filter(l => l.amount || l.label).map(l => ({
