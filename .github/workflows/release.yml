@@ -11,11 +11,14 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            asset_name: ledger-agent-linux
+            asset_base: ledger-agent-linux
+            ext: ""
           - os: macos-latest
-            asset_name: ledger-agent-macos
+            asset_base: ledger-agent-macos
+            ext: ""
           - os: windows-latest
-            asset_name: ledger-agent-windows.exe
+            asset_base: ledger-agent-windows
+            ext: ".exe"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -33,16 +36,16 @@ jobs:
 
       - name: Rename binary (Unix)
         if: runner.os != 'Windows'
-        run: mv agent/dist/ledger-agent agent/dist/${{ matrix.asset_name }}
+        run: mv agent/dist/ledger-agent "agent/dist/${{ matrix.asset_base }}-${{ github.ref_name }}${{ matrix.ext }}"
 
       - name: Rename binary (Windows)
         if: runner.os == 'Windows'
-        run: mv agent/dist/ledger-agent.exe agent/dist/${{ matrix.asset_name }}
+        run: mv agent/dist/ledger-agent.exe "agent/dist/${{ matrix.asset_base }}-${{ github.ref_name }}${{ matrix.ext }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
-          path: agent/dist/${{ matrix.asset_name }}
+          name: ${{ matrix.asset_base }}-${{ github.ref_name }}${{ matrix.ext }}
+          path: agent/dist/${{ matrix.asset_base }}-${{ github.ref_name }}${{ matrix.ext }}
 
   build-vscode-extension:
     runs-on: ubuntu-latest
@@ -63,12 +66,12 @@ jobs:
 
       - name: Package .vsix
         working-directory: vscode-extension
-        run: npx --yes @vscode/vsce package --out ledger-token-sync.vsix
+        run: npx --yes @vscode/vsce package --out "ledger-token-sync-${{ github.ref_name }}.vsix"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ledger-token-sync.vsix
-          path: vscode-extension/ledger-token-sync.vsix
+          name: ledger-token-sync-${{ github.ref_name }}.vsix
+          path: vscode-extension/ledger-token-sync-${{ github.ref_name }}.vsix
 
   release:
     needs: [build, build-vscode-extension]

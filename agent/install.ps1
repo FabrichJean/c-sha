@@ -10,11 +10,13 @@ $repo = "FabrichJean/c-sha"
 $destDir = Join-Path $env:USERPROFILE ".ledger\bin"
 New-Item -ItemType Directory -Force -Path $destDir | Out-Null
 
-Write-Host "Recuperation de la derniere release (ledger-agent-windows.exe)..."
+Write-Host "Recuperation de la derniere release (ledger-agent-windows-*)..."
 $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest"
-$asset = $release.assets | Where-Object { $_.name -eq "ledger-agent-windows.exe" }
+# le nom de l'asset porte le tag de version (ex: ledger-agent-windows-v0.3.1.exe) —
+# on filtre par motif plutot que par egalite exacte.
+$asset = $release.assets | Where-Object { $_.name -like "ledger-agent-windows-*" }
 if (-not $asset) {
-    Write-Error "Aucune release trouvee avec l'asset ledger-agent-windows.exe. Cree d'abord un tag (ex: v0.1.0) pour declencher le build."
+    Write-Error "Aucune release trouvee avec un asset ledger-agent-windows-*. Cree d'abord un tag (ex: v0.1.0) pour declencher le build."
     exit 1
 }
 

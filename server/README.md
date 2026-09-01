@@ -136,11 +136,14 @@ lancer soi-même (marche dans un terminal réellement interactif) :
 ```
 
 Le binaire est installé dans `~/.ledger/bin/` (`%USERPROFILE%\.ledger\bin\` sur
-Windows). Pour resynchroniser/désinstaller ensuite : `~/.ledger/bin/ledger-agent
-sync|uninstall`. Les binaires (`ledger-agent-macos`, `ledger-agent-linux`,
-`ledger-agent-windows.exe`) sont générés automatiquement par
-`.github/workflows/release.yml` à chaque tag `v*` poussé sur le dépôt — il faut
-qu'au moins une release existe avant de lancer ces scripts.
+Windows) sous un nom stable (`ledger-agent` / `ledger-agent.exe`, sans le
+numéro de version). Pour resynchroniser/désinstaller ensuite :
+`~/.ledger/bin/ledger-agent sync|uninstall`. Les binaires publiés sur la page
+Releases portent eux le tag de version dans leur nom (ex.
+`ledger-agent-linux-v0.3.1`, `ledger-agent-windows-v0.3.1.exe`) et sont
+générés automatiquement par `.github/workflows/release.yml` à chaque tag `v*`
+poussé sur le dépôt — il faut qu'au moins une release existe avant de lancer
+ces scripts.
 
 ## Variables d'environnement
 

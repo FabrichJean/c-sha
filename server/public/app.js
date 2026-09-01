@@ -1559,7 +1559,7 @@ function docsInstallStepList(os, pythonMode) {
         `Ouvre <strong>PowerShell</strong> (touche Windows → tape <code class="k">powershell</code> → Entrée).`,
         `Colle ces lignes (URL et clé déjà remplies pour ce serveur), puis Entrée :
           ${docsCodeBlock(`$env:LEDGER_URL = "${docsRealUrl()}"\n$env:LEDGER_SYNC_API_KEY = "${docsRealKey()}"\nirm ${DOCS_REPO_RAW}/install.ps1 | iex`)}`,
-        `C'est tout. Le script télécharge <code class="k">ledger-agent-windows.exe</code> dans <code class="k">%USERPROFILE%\\.ledger\\bin\\</code>, l'enregistre et programme son démarrage automatique (tâche planifiée Windows).`,
+        `C'est tout. Le script télécharge le binaire correspondant (sous le nom stable <code class="k">ledger-agent.exe</code>) dans <code class="k">%USERPROFILE%\\.ledger\\bin\\</code>, l'enregistre et programme son démarrage automatique (tâche planifiée Windows).`,
       ];
     }
     return [
@@ -1576,7 +1576,7 @@ function docsInstallStepList(os, pythonMode) {
         `Ouvre <strong>Terminal</strong> (Cmd+Espace → tape <code class="k">terminal</code> → Entrée).`,
         `Colle cette commande (URL et clé déjà remplies pour ce serveur) :
           ${docsCodeBlock(`LEDGER_URL="${docsRealUrl()}" LEDGER_SYNC_API_KEY="${docsRealKey()}" \\\n  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"`)}`,
-        `Le script télécharge <code class="k">ledger-agent-macos</code> dans <code class="k">~/.ledger/bin/</code>, le configure et l'enregistre comme LaunchAgent (démarre tout seul, y compris après redémarrage).`,
+        `Le script télécharge le binaire correspondant (sous le nom stable <code class="k">ledger-agent</code>) dans <code class="k">~/.ledger/bin/</code>, le configure et l'enregistre comme LaunchAgent (démarre tout seul, y compris après redémarrage).`,
       ];
     }
     return [
@@ -1593,7 +1593,7 @@ function docsInstallStepList(os, pythonMode) {
       `Ouvre un terminal.`,
       `Colle cette commande (URL et clé déjà remplies pour ce serveur) :
         ${docsCodeBlock(`LEDGER_URL="${docsRealUrl()}" LEDGER_SYNC_API_KEY="${docsRealKey()}" \\\n  bash -c "$(curl -fsSL ${DOCS_REPO_RAW}/install.sh)"`)}`,
-      `Le script télécharge <code class="k">ledger-agent-linux</code> dans <code class="k">~/.ledger/bin/</code> et l'enregistre comme service <code class="k">systemd --user</code> (redémarre tout seul en cas d'arrêt). Si <code class="k">systemd --user</code> n'est pas disponible (certains conteneurs/VPS minimalistes), repli automatique sur une entrée <code class="k">crontab</code>.`,
+      `Le script télécharge le binaire correspondant (sous le nom stable <code class="k">ledger-agent</code>) dans <code class="k">~/.ledger/bin/</code> et l'enregistre comme service <code class="k">systemd --user</code> (redémarre tout seul en cas d'arrêt). Si <code class="k">systemd --user</code> n'est pas disponible (certains conteneurs/VPS minimalistes), repli automatique sur une entrée <code class="k">crontab</code>.`,
     ];
   }
   return [
