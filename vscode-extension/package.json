@@ -1,0 +1,64 @@
+{
+  "name": "ledger-token-sync",
+  "displayName": "Ledger — Token Sync",
+  "description": "Synchronise automatiquement ta consommation de tokens Claude Code vers ton serveur Ledger, directement depuis VS Code.",
+  "version": "0.1.0",
+  "publisher": "ledger-local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ledger.configure",
+        "title": "Ledger: Configurer le serveur"
+      },
+      {
+        "command": "ledger.refresh",
+        "title": "Ledger: Rafraîchir maintenant"
+      }
+    ],
+    "configuration": {
+      "title": "Ledger",
+      "properties": {
+        "ledger.serverUrl": {
+          "type": "string",
+          "default": "",
+          "description": "URL du serveur Ledger (ex: https://ledger.mondomaine.com). La clé API de sync se configure séparément via la commande \"Ledger: Configurer le serveur\" (stockée de façon chiffrée, jamais en clair dans les paramètres)."
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ledger",
+          "title": "Ledger",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ledger": [
+        {
+          "type": "webview",
+          "id": "ledger.usagePanel",
+          "name": "Conso de ce projet"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./ && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "typecheck": "tsc -p ./ --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0"
+  }
+}
