@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { db } = require("../db");
+const { costOf } = require("./pricing");
 
 function upsertDevice(id, name, hostname) {
   const now = new Date().toISOString();
@@ -43,6 +44,14 @@ function getDeviceDailyRows(deviceId) {
   return rows;
 }
 
+/* cout total tous temps d'un appareil, avec la vraie grille tarifaire admin
+   (personnalisee ou par defaut) — utilise par les endpoints qui renvoient un
+   montant $ deja calcule sans exposer la grille elle-meme (ex: extension
+   VS Code, qui n'a que la cle API de sync, pas les identifiants admin). */
+function getDeviceTotalCost(deviceId) {
+  return getDeviceDailyRows(deviceId).reduce((sum, row) => sum + costOf(row.model, row), 0);
+}
+
 /* suivi de facturation pour UN appareil : ne retient que la part de chaque
    facture qui le concerne (ligne "appareil" ou "montant personnalise" plafonne
    sur lui) — jamais le nom du client, pour rester sans danger sur un lien public */
@@ -59,4 +68,4 @@ function getDeviceBillingSummary(deviceId) {
   return { totalPaid, entries };
 }
 
-module.exports = { upsertDevice, ensureViewToken, getProjectNamesMap, getDeviceDailyRows, getDeviceBillingSummary };
+module.exports = { upsertDevice, ensureViewToken, getProjectNamesMap, getDeviceDailyRows, getDeviceTotalCost, getDeviceBillingSummary };
