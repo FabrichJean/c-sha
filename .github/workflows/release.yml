@@ -1,4 +1,4 @@
-name: Release agent binaries
+name: Release agent binaries and VS Code extension
 
 on:
   push:
@@ -44,8 +44,34 @@ jobs:
           name: ${{ matrix.asset_name }}
           path: agent/dist/${{ matrix.asset_name }}
 
+  build-vscode-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        working-directory: vscode-extension
+        run: npm install --include=dev
+
+      - name: Compile
+        working-directory: vscode-extension
+        run: npm run compile
+
+      - name: Package .vsix
+        working-directory: vscode-extension
+        run: npx --yes @vscode/vsce package --out ledger-token-sync.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ledger-token-sync.vsix
+          path: vscode-extension/ledger-token-sync.vsix
+
   release:
-    needs: build
+    needs: [build, build-vscode-extension]
     runs-on: ubuntu-latest
     permissions:
       contents: write

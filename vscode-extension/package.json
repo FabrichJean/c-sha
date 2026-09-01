@@ -4,6 +4,11 @@
   "description": "Synchronise automatiquement ta consommation de tokens Claude Code vers ton serveur Ledger, directement depuis VS Code.",
   "version": "0.1.0",
   "publisher": "ledger-local",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FabrichJean/c-sha.git",
+    "directory": "vscode-extension"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
