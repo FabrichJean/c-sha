@@ -2,7 +2,7 @@
   "name": "ledger-token-sync",
   "displayName": "Ledger — Token Sync",
   "description": "Synchronise automatiquement ta consommation de tokens Claude Code vers ton serveur Ledger, directement depuis VS Code.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "ledger-local",
   "repository": {
     "type": "git",
