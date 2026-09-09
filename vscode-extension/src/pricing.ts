@@ -1,12 +1,12 @@
 import { DailyTotals } from "./exportUsage";
 
 /* Meme grille que server/lib/pricing.js (DEFAULT_PRICING_SERVER), avec le
-   meme facteur de calibration /200 que server/public/app.js::costOf — pour
+   meme facteur de calibration /130 que server/public/app.js::costOf — pour
    que l'estimation locale du panneau corresponde a ce que montre le CRM.
    L'extension n'a pas acces a la grille tarifaire personnalisee de l'admin
    (elle n'a que la cle API de sync, pas les identifiants Basic Auth) : c'est
    volontairement une estimation, jamais la source de verite facturee. */
-const COST_CALIBRATION_FACTOR = 200;
+const COST_CALIBRATION_FACTOR = 130;
 
 const MODEL_PRICING: Record<string, { in: number; out: number; cacheWrite: number; cacheRead: number }> = {
   "claude-fable-5": { in: 10, out: 50, cacheWrite: 12.5, cacheRead: 1 },

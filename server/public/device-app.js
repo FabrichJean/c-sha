@@ -68,9 +68,9 @@ function pricingFor(model) {
   return p.models[model] || p.fallback || DEFAULT_PRICING.fallback;
 }
 /* facteur de calibration : le calcul brut (prix/1M tokens) surestimait le cout
-   reel d'un facteur ~200 constate par comparaison avec la facturation Anthropic
+   reel d'un facteur ~130 constate par comparaison avec la facturation Anthropic
    reelle — a ajuster si les tarifs par modele sont un jour corriges directement. */
-const COST_CALIBRATION_FACTOR = 200;
+const COST_CALIBRATION_FACTOR = 130;
 function costOf(model, totals) {
   const p = pricingFor(model);
   const t = totals || {};

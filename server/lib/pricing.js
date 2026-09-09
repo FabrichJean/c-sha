@@ -22,13 +22,13 @@ function getPricing() {
 }
 
 /* meme facteur que server/public/app.js::costOf — le calcul brut (prix/1M
-   tokens) surestimait le cout reel d'un facteur ~200 constate par
+   tokens) surestimait le cout reel d'un facteur ~130 constate par
    comparaison avec la facturation Anthropic reelle. Le serveur ne calculait
    jusqu'ici jamais de cout lui-meme (tout etait fait cote navigateur) ; cette
    fonction sert aux endpoints qui doivent renvoyer un montant $ deja calcule
    (ex: /api/device-status, pour l'extension VS Code) sans exposer la grille
    tarifaire complete. */
-const COST_CALIBRATION_FACTOR = 200;
+const COST_CALIBRATION_FACTOR = 130;
 function costOf(model, totals, pricing) {
   const p = (pricing || getPricing());
   const rate = (p.models && p.models[model]) || p.fallback || DEFAULT_PRICING_SERVER.fallback;
