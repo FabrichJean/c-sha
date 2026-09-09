@@ -23,6 +23,13 @@ function timeAgo(iso: string): string {
   return `il y a ${Math.round(sec / 86400)} j`;
 }
 
+const INVOICE_STATUS_LABELS: Record<string, string> = { draft: "Brouillon", sent: "Envoyée", paid: "Payée" };
+function statusDotClass(status: string): string {
+  if (status === "paid") return "dot-paid";
+  if (status === "sent") return "dot-sent";
+  return "dot-draft";
+}
+
 function currentProjectKey(): string | null {
   const folders = vscode.workspace.workspaceFolders;
   if (!folders || folders.length === 0) return null;
@@ -168,6 +175,30 @@ export class UsagePanelProvider implements vscode.WebviewViewProvider {
           <div class="value ${remaining > 0 ? "warn" : ""}">${fmtUsd(remaining)}</div>
         </div>
       </div>
+      ${this.renderInvoiceList(s.billing.entries)}
+    `;
+  }
+
+  /* factures qui concernent cet appareil (part de chaque facture plafonnee
+     sur lui, cf. getDeviceBillingSummary cote serveur) — jamais le nom du
+     client, meme regle que le reste de cette section. */
+  private renderInvoiceList(entries: DeviceStatus["billing"]["entries"]): string {
+    if (entries.length === 0) return "";
+    return `
+      <table class="inv-table">
+        <thead><tr><th>Date</th><th>Statut</th><th class="num">Montant</th></tr></thead>
+        <tbody>
+          ${entries
+            .map(
+              (e) => `<tr>
+            <td>${new Date(e.date).toLocaleDateString("fr-FR")}</td>
+            <td><span class="dot ${statusDotClass(e.status)}"></span>${escapeHtml(INVOICE_STATUS_LABELS[e.status] || e.status)}</td>
+            <td class="num">${fmtUsd(e.amount)}</td>
+          </tr>`
+            )
+            .join("")}
+        </tbody>
+      </table>
     `;
   }
 
@@ -189,11 +220,19 @@ export class UsagePanelProvider implements vscode.WebviewViewProvider {
   .sep { border-top: 1px solid var(--vscode-widget-border, rgba(128,128,128,.3)); margin: 14px 0 12px; }
   .row { display: flex; align-items: center; gap: 8px; }
   .row .inline { margin-left: 2px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-editorWarning-foreground); flex-shrink: 0; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-editorWarning-foreground); flex-shrink: 0; display: inline-block; }
   .dot.on { background: var(--vscode-testing-iconPassed, #3fb950); }
+  .dot-paid { background: var(--vscode-testing-iconPassed, #3fb950); }
+  .dot-sent { background: var(--vscode-editorWarning-foreground); }
+  .dot-draft { background: var(--vscode-descriptionForeground, #8b8b8b); }
   .value.good { color: var(--vscode-testing-iconPassed, #3fb950); }
   .value.warn { color: var(--vscode-editorWarning-foreground); }
   code { font-family: var(--vscode-editor-font-family); background: var(--vscode-textCodeBlock-background); padding: 1px 5px; border-radius: 4px; }
+  .inv-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+  .inv-table th { text-align: left; font-weight: 500; opacity: .6; font-size: 10px; text-transform: uppercase; letter-spacing: .03em; padding: 0 6px 5px 0; border-bottom: 1px solid var(--vscode-widget-border, rgba(128,128,128,.3)); }
+  .inv-table td { padding: 5px 6px 5px 0; border-bottom: 1px solid var(--vscode-widget-border, rgba(128,128,128,.15)); vertical-align: middle; }
+  .inv-table td .dot { margin-right: 5px; vertical-align: middle; }
+  .inv-table th.num, .inv-table td.num { text-align: right; }
 </style>
 </head>
 <body>${body}</body>
