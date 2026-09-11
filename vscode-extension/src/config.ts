@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
+import * as vscode from "vscode";
 import { CONFIG_FILE, DEVICE_FILE, STATE_FILE } from "./paths";
 import { log } from "./log";
 
@@ -32,8 +33,23 @@ function writeJson(file: string, data: unknown): void {
   fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf-8");
 }
 
+/* L'URL du serveur est modifiable de deux facons : le parametre VS Code
+   "ledger.serverUrl" (visible/editable dans les Settings, pratique pour la
+   changer sans repasser par la commande) ou la commande "Ledger: Configurer
+   le serveur". Quand le parametre est renseigne, il est prioritaire — sinon
+   on retombe sur la valeur enregistree dans sync_config.json (celle ecrite
+   par l'agent CLI ou par une precedente utilisation de la commande). La cle
+   API, elle, ne vit jamais dans les Settings VS Code (synchronises/partages
+   en clair) : uniquement dans sync_config.json. */
+export function getSettingUrl(): string {
+  return (vscode.workspace.getConfiguration("ledger").get<string>("serverUrl") || "").trim();
+}
+
 export function loadConfig(): SyncConfig | null {
-  return readJson<SyncConfig>(CONFIG_FILE);
+  const stored = readJson<SyncConfig>(CONFIG_FILE);
+  const settingUrl = getSettingUrl();
+  if (settingUrl) return { url: settingUrl, apiKey: stored?.apiKey || "", syncIntervalSeconds: stored?.syncIntervalSeconds };
+  return stored;
 }
 
 export function saveConfig(config: SyncConfig): void {

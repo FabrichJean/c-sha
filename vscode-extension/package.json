@@ -2,7 +2,7 @@
   "name": "ledger-token-sync",
   "displayName": "Ledger — Token Sync",
   "description": "Synchronise automatiquement ta consommation de tokens Claude Code vers ton serveur Ledger, directement depuis VS Code.",
-  "version": "0.3.0",
+  "version": "0.3.5",
   "publisher": "ledger-local",
   "repository": {
     "type": "git",
@@ -42,7 +42,7 @@
         "ledger.serverUrl": {
           "type": "string",
           "default": "",
-          "description": "URL du serveur Ledger (ex: https://ledger.mondomaine.com). La clé API de sync se configure séparément via la commande \"Ledger: Configurer le serveur\" (stockée de façon chiffrée, jamais en clair dans les paramètres)."
+          "description": "URL du serveur Ledger (ex: https://ledger.mondomaine.com). Modifiable ici ou via la commande \"Ledger: Configurer le serveur\". La clé API de sync ne se configure que via cette commande — jamais dans ce fichier de paramètres, qui peut être synchronisé ou partagé."
         }
       }
     },

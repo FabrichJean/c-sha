@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { loadConfig, saveConfig } from "./config";
+import { loadConfig, saveConfig, getSettingUrl } from "./config";
 import { SyncDaemon, SyncStatus } from "./sync";
 import { createStatusBarItem, updateStatusBarItem } from "./statusBar";
 import { UsagePanelProvider } from "./panel";
@@ -43,11 +43,17 @@ export function activate(context: vscode.ExtensionContext): void {
         prompt: "SYNC_API_KEY affichée au premier démarrage du serveur (ou dans server/data/.env)",
         password: true,
         ignoreFocusOut: true,
+        value: existing?.apiKey || "",
         validateInput: (v) => (v.trim() ? null : "La clé API est requise."),
       });
       if (apiKey === undefined) return; // annule
 
       saveConfig({ url: url.trim(), apiKey: apiKey.trim() });
+      // on reflete aussi l'URL dans le parametre VS Code "ledger.serverUrl"
+      // (Settings UI) pour que les deux facons de la configurer restent en phase.
+      await vscode.workspace
+        .getConfiguration("ledger")
+        .update("serverUrl", url.trim(), vscode.ConfigurationTarget.Global);
       log("Configuration enregistree via la commande Ledger: Configurer le serveur.");
       vscode.window.showInformationMessage("Ledger : configuration enregistrée. Test de connexion en cours…");
 
@@ -85,6 +91,34 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const watcher = vscode.workspace.onDidChangeWorkspaceFolders(() => panelProvider.refresh());
   context.subscriptions.push(watcher);
+
+  // l'URL peut aussi etre changee directement dans les Settings VS Code
+  // (parametre "ledger.serverUrl") sans repasser par la commande : on
+  // reagit au changement pour retester la connexion et rafraichir l'UI.
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async (e) => {
+      if (!e.affectsConfiguration("ledger.serverUrl")) return;
+      const newUrl = getSettingUrl();
+      if (!newUrl) return;
+      log(`URL du serveur modifiee via les parametres VS Code : ${newUrl}`);
+      const config = loadConfig();
+      if (!config?.apiKey) {
+        vscode.window
+          .showWarningMessage(
+            "Ledger : URL mise à jour, mais aucune clé API n'est enregistrée.",
+            "Configurer la clé API"
+          )
+          .then((choice) => {
+            if (choice) vscode.commands.executeCommand("ledger.configure");
+          });
+        return;
+      }
+      const ok = await daemon?.forceSync();
+      if (ok) vscode.window.setStatusBarMessage("Ledger : nouvelle URL testée avec succès", 3000);
+      else vscode.window.showWarningMessage("Ledger : échec de connexion à la nouvelle URL — voir la sortie \"Ledger\".");
+      panelProvider.refresh();
+    })
+  );
 }
 
 export function deactivate(): void {
